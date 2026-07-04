@@ -15,6 +15,11 @@ let session=null;
 const isHost=()=>!!session;
 let route='home';
 
+/* remembered guest identity (per device) so guests pick their name only once */
+function getMe(){try{const id=localStorage.getItem('ofsc_me')||'';return id&&guest(id)?id:'';}catch(e){return '';}}
+function setMe(id){try{if(id)localStorage.setItem('ofsc_me',id);}catch(e){}}
+function clearMe(){try{localStorage.removeItem('ofsc_me');}catch(e){}window.__voter='';render();}
+
 /* ---------------- Toast + Modal ---------------- */
 function toast(msg,type='ok',ms=2800){const el=document.createElement('div');el.className='toast '+(type==='ok'?'':type);el.textContent=msg;$('#toast').appendChild(el);setTimeout(()=>el.remove(),ms);}
 function openModal(title,body,footer){$('#modalRoot').innerHTML=`<div class="modal-bg" data-close><div class="modal"><div class="mh"><h2>${esc(title)}</h2><button class="x" data-close>✕</button></div><div class="mb">${body}</div>${footer?`<div class="mf">${footer}</div>`:''}</div></div>`;}
@@ -113,7 +118,7 @@ VIEWS.home=function(){
   const cur=evById(state.settings.current_event_id), nxt=evById(state.settings.next_event_id);
   const st=teamStandings(), done=state.events.filter(e=>e.status==='complete').length;
   const act=state.announcements.filter(a=>a.active);
-  return `<div class="section-title"><div><div class="eyebrow">${isHost()?'Command Center':'Welcome to the'}</div><h1 class="disp">${isHost()?'Dashboard':esc(state.settings.event_name||'OFSC Olympics')}</h1><div class="sub">${esc(state.settings.date_label||'')}</div></div></div>
+  return `<div class="section-title"><div><div class="eyebrow">${isHost()?'Command Center':'Welcome to the'}</div><h1 class="disp">${isHost()?'Dashboard':esc(state.settings.event_name||'OFSC Olympics')}</h1><div class="sub">${(!isHost()&&getMe())?`👋 ${esc(guestName(getMe()))} · `:''}${esc(state.settings.date_label||'')}</div></div></div>
   <div class="grid g2" style="margin-bottom:14px">
     <div class="scoreboard"><div class="eyebrow" style="color:var(--sun3)">Now Competing</div><h2 style="margin:4px 0 2px">${cur?esc(cur.name):'Intermission'}</h2><div class="mut small">${cur?esc(cur.location||''):'Glory is temporary. Bragging rights are forever.'}</div><div class="divider"></div><div class="eyebrow" style="color:var(--teal)">Next Up</div><h2 style="margin:4px 0 2px;font-size:22px">${nxt?esc(nxt.name):'—'}</h2></div>
     <div class="grid g2">
@@ -152,16 +157,15 @@ VIEWS.schedule=function(){
 VIEWS.signup=function(){
   const bes=state.events.filter(e=>e.is_bracket).sort((a,b)=>a.sort-b.sort);
   const sel=window.__suEvent||(bes[0]&&bes[0].id);window.__suEvent=sel;
-  const ev=evById(sel);
+  const ev=evById(sel);const me=getMe();
   const mine=state.signups.filter(s=>s.event_id===sel);
   return `<div class="section-title"><div><div class="eyebrow">Grab a teammate</div><h1 class="disp">Event Sign Up</h1><div class="sub">Only these five events need signups. Everything else — just show up and play.</div></div></div>
   <div class="btnrow" style="margin-bottom:12px">${bes.map(e=>`<button class="btn sm ${e.id===sel?'primary':'ghost'}" data-suevent="${e.id}">${esc(e.name)}${e.bracket_size===1?' (solo)':''}</button>`).join('')}</div>
   ${ev?`<div class="card">
     <div class="disp" style="font-size:20px;margin-bottom:6px">${esc(ev.name)} — ${ev.bracket_size===1?'singles':'pairs'}</div>
     <div class="mut small" style="margin-bottom:12px">${ev.bracket_size===1?'Sign up as yourself.':'Pick yourself and your teammate.'} ${mine.length} entrant${mine.length===1?'':'s'} so far.</div>
-    <label class="f"><span>${ev.bracket_size===1?'You':'Player 1'}</span><select class="i" id="suP1"><option value="">— select —</option>${state.guests.map(g=>`<option value="${g.id}">${esc(g.display_name)} (${esc(g.family)})</option>`).join('')}</select></label>
-    ${ev.bracket_size===2?`<label class="f"><span>Player 2 (teammate)</span><select class="i" id="suP2"><option value="">— select —</option>${state.guests.map(g=>`<option value="${g.id}">${esc(g.display_name)} (${esc(g.family)})</option>`).join('')}</select></label>`:''}
-    <label class="f"><span>Entrant name (optional)</span><input class="i" id="suName" placeholder="e.g. The Bag Slayers"></label>
+    <label class="f"><span>${ev.bracket_size===1?'You':'Player 1 (you)'}</span><select class="i" id="suP1"><option value="">— select your name —</option>${state.guests.map(g=>`<option value="${g.id}" ${me===g.id?'selected':''}>${esc(g.display_name)}</option>`).join('')}</select></label>
+    ${ev.bracket_size===2?`<label class="f"><span>Player 2 (teammate)</span><select class="i" id="suP2"><option value="">— select —</option>${state.guests.map(g=>`<option value="${g.id}">${esc(g.display_name)}</option>`).join('')}</select></label>`:''}
     <button class="btn primary block" data-dosignup="${ev.id}">Sign up</button>
   </div>
   <div class="card" style="margin-top:14px"><div class="disp" style="font-size:16px;margin-bottom:8px">Signed up for ${esc(ev.name)}</div>
@@ -185,7 +189,7 @@ VIEWS.brackets=function(){
   return `<div class="section-title"><div><div class="eyebrow">March to a Champion</div><h1 class="disp">Brackets</h1></div></div>
   <div class="btnrow" style="margin-bottom:12px">${bes.map(e=>`<button class="btn sm ${e.id===sel?'primary':'ghost'}" data-bkevent="${e.id}">${esc(e.name)}</button>`).join('')}</div>
   ${champ?`<div class="champ" style="margin-bottom:14px"><div class="eyebrow" style="color:var(--gold)">Champion</div><div class="disp" style="font-size:30px">🏆 ${esc(signupLabel(state.signups.find(s=>s.id===champ)))}</div></div>`:''}
-  ${isHost()?`<div class="card" style="margin-bottom:14px"><div class="inline" style="justify-content:space-between;flex-wrap:wrap;gap:8px"><div class="disp" style="font-size:16px">Host controls · ${signups.length} entrants</div><div class="btnrow"><button class="btn sm teal" data-genbracket="${sel}">${ms.length?'Re-draw bracket':'Generate bracket (random)'}</button><button class="btn sm ghost" data-seedbracket="${sel}">Manual seed…</button></div></div><div class="mut small" style="margin-top:6px">Random draw with automatic byes. Use manual seed to arrange it yourself.</div></div>`:''}
+  ${isHost()?`<div class="card" style="margin-bottom:14px"><div class="inline" style="justify-content:space-between;flex-wrap:wrap;gap:8px"><div class="disp" style="font-size:16px">Host controls · ${signups.length} entrants</div><div class="btnrow"><button class="btn sm teal" data-genbracket="${sel}">${ms.length?'Re-draw bracket':'Generate bracket (random)'}</button><button class="btn sm ghost" data-seedbracket="${sel}">Manual seed…</button><button class="btn sm bad" data-clearevsignups="${sel}">Clear sign-ups</button></div></div><div class="mut small" style="margin-top:6px">Random draw with automatic byes. Use manual seed to arrange it yourself.</div></div>`:''}
   ${bracketHtml}`;
 };
 function matchCard(m){
@@ -260,10 +264,10 @@ VIEWS.voting=function(){
   return `${isHost()?`<div class="btnrow" style="margin-bottom:12px"><button class="btn sm ghost" data-votemode="admin">Admin control</button><button class="btn sm primary" data-votemode="guest">Ballot preview</button></div>`:''}${guestBallotView()}`;
 };
 function guestBallotView(){
-  const voter=window.__voter||'';window.__voter=voter;
+  const voter=window.__voter||getMe()||'';window.__voter=voter;
   const open=state.awards.filter(a=>a.is_open&&a.award_type==='vote');
   return `<div class="card" style="max-width:520px;margin:0 auto"><div class="center" style="margin-bottom:12px"><div class="disp" style="font-size:26px;color:var(--sun3)">OFSC Awards Voting</div><div class="mut small">One vote per award.</div></div>
-  <label class="f"><span>Who are you?</span><select class="i" data-voter><option value="">— select your name —</option>${state.guests.map(g=>`<option value="${g.id}" ${voter===g.id?'selected':''}>${esc(g.display_name)} (${esc(g.family)})</option>`).join('')}</select></label>
+  ${voter?`<div class="inline" style="justify-content:space-between;margin-bottom:10px"><span class="pill ok">Voting as ${esc(guestName(voter))}</span><button class="btn xs ghost" data-clearme>Not you?</button></div>`:`<label class="f"><span>Who are you?</span><select class="i" data-voter><option value="">— select your name —</option>${state.guests.map(g=>`<option value="${g.id}">${esc(g.display_name)}</option>`).join('')}</select></label>`}
   ${!voter?'<div class="mut small center">Select your name to see open awards.</div>':(!open.length?'<div class="empty">No awards are open right now.</div>':open.map(a=>{const already=state.votes.some(v=>v.award_id===a.id&&v.voter_id===voter);const noms=nominees(a);return `<div class="divider"></div><div class="disp" style="font-size:18px">${esc(a.name)}</div><div class="mut small" style="margin-bottom:8px">${esc(a.description)}</div>${already?'<div class="pill ok">✓ You already voted</div>':`<select class="i ballot-nom" data-award="${a.id}" style="margin-bottom:8px"><option value="">— choose —</option>${noms.map(n=>`<option value="${n.id}">${esc(n.label)}</option>`).join('')}</select><input class="i ballot-cm" data-award="${a.id}" placeholder="Optional comment" style="margin-bottom:8px"><button class="btn primary block sm" data-castvote="${a.id}">Submit vote</button>`}`;}).join(''))}</div>`;
 }
 function nominees(a){if(a.subject==='team')return state.teams.map(t=>({id:t.id,label:t.name}));if(a.subject==='kid')return state.guests.filter(g=>g.kind==='kid').map(g=>({id:g.id,label:g.display_name+' ('+g.family+')'}));return state.guests.map(g=>({id:g.id,label:g.display_name+' ('+g.family+')'}));}
@@ -321,6 +325,10 @@ VIEWS.admin=function(){
   </div>
   <div class="card"><div class="disp" style="font-size:18px;margin-bottom:10px">Point values</div><div class="grid g4">${['first','second','third','participation'].map(k=>`<label class="f"><span>${k}</span><input class="i" type="number" data-pts="${k}" value="${(m.points||{})[k]||0}"></label>`).join('')}</div></div>
   <div class="card"><div class="disp" style="font-size:18px;margin-bottom:10px">Data</div><div class="btnrow"><button class="btn teal" data-act="exportAll">⬇ Export JSON backup</button><button class="btn ghost sm" data-export="scores">Scores CSV</button><button class="btn ghost sm" data-export="votes">Votes CSV</button></div></div>
+  <div class="card"><div class="disp" style="font-size:18px;margin-bottom:10px">Reset & demo controls</div>
+    <div class="btnrow"><button class="btn ghost sm" data-act="resetStatuses">↺ Reset event/schedule statuses</button><button class="btn bad sm" data-act="clearBrackets">Clear all brackets</button><button class="btn bad sm" data-act="clearSignups">Clear all sign-ups</button><button class="btn bad sm" data-act="clearScores">Clear all scores</button><button class="btn bad sm" data-act="clearVotes">Clear all votes</button></div>
+    <div class="mut small" style="margin-top:8px">Use <b>Clear all sign-ups</b> to wipe the demo entrants before the real event. Each button asks to confirm.</div>
+  </div>
   <div class="card"><div class="disp" style="font-size:18px;margin-bottom:10px">Teams & guests</div><div class="btnrow"><button class="btn ghost sm" data-nav="managers|teams">Manage teams</button><button class="btn ghost sm" data-nav="managers|guests">Manage guests</button></div></div>`;
 };
 
@@ -420,7 +428,7 @@ document.addEventListener('change',async e=>{
   if(t.matches('[data-scselect]')){window.__scEvent=t.value;render();}
   else if(t.matches('[data-sctype]')){await upd('events',t.dataset.sctype,{scoring_type:t.value});await loadAndRender();}
   else if(t.matches('[data-suevent]')){}
-  else if(t.matches('[data-voter]')){window.__voter=t.value;render();}
+  else if(t.matches('[data-voter]')){window.__voter=t.value;setMe(t.value);render();}
   else if(t.matches('[data-chmatch]')){window.__ch={matchId:t.value,a:0,b:0,hist:[]};render();}
   else if(t.matches('[data-meta]')){await upd('settings',1,{[t.dataset.meta]:t.value||null});await loadAll();if(t.dataset.meta==='event_name')$('#topName').textContent=t.value;}
   else if(t.matches('[data-pts]')){const p={...(state.settings.points||{})};p[t.dataset.pts]=+t.value||0;await upd('settings',1,{points:p});await loadAll();}
@@ -431,7 +439,7 @@ document.addEventListener('input',e=>{const t=e.target;
 });
 
 document.addEventListener('click',async e=>{
-  const el=e.target.closest('[data-nav],[data-more],[data-close],[data-act],[data-lb],[data-blockstatus],[data-suevent],[data-dosignup],[data-delsignup],[data-bkevent],[data-genbracket],[data-seedbracket],[data-matchresult],[data-saveplacement],[data-saveh2h],[data-savebest],[data-addbest],[data-savemanual],[data-savebonus],[data-completeevent],[data-delscore],[data-ch],[data-chundo],[data-chreset],[data-chsave],[data-votemode],[data-voteall],[data-awardopen],[data-awardwinner],[data-awardreset],[data-awardlock],[data-castvote],[data-annadd],[data-annpreset],[data-anntoggle],[data-anndel],[data-login],[data-logout],[data-export],[data-fsexit],[data-tvprev],[data-tvnext],[data-awardprev],[data-awardnext],[data-awardreveal],[data-editteam],[data-editguest],[data-addguest],[data-saveteam],[data-saveguest],[data-delguest],[data-pickcolor],[data-savewinner],[data-shuffleseed],[data-seedmove],[data-dogenerate],[data-submitresult]');
+  const el=e.target.closest('[data-nav],[data-more],[data-close],[data-act],[data-lb],[data-blockstatus],[data-suevent],[data-dosignup],[data-delsignup],[data-bkevent],[data-genbracket],[data-seedbracket],[data-matchresult],[data-saveplacement],[data-saveh2h],[data-savebest],[data-addbest],[data-savemanual],[data-savebonus],[data-completeevent],[data-delscore],[data-ch],[data-chundo],[data-chreset],[data-chsave],[data-votemode],[data-voteall],[data-awardopen],[data-awardwinner],[data-awardreset],[data-awardlock],[data-castvote],[data-annadd],[data-annpreset],[data-anntoggle],[data-anndel],[data-login],[data-logout],[data-export],[data-fsexit],[data-tvprev],[data-tvnext],[data-awardprev],[data-awardnext],[data-awardreveal],[data-editteam],[data-editguest],[data-addguest],[data-saveteam],[data-saveguest],[data-delguest],[data-pickcolor],[data-savewinner],[data-shuffleseed],[data-seedmove],[data-dogenerate],[data-submitresult],[data-clearme],[data-clearevsignups]');
   if(!el)return;const d=el.dataset;
 
   if('nav'in d){if(d.nav.startsWith('managers|')){d.nav.split('|')[1]==='teams'?manageTeams():manageGuests();}else go(d.nav);return;}
@@ -440,6 +448,8 @@ document.addEventListener('click',async e=>{
   if('lb'in d){window.__lb=d.lb;render();return;}
   if('suevent'in d){window.__suEvent=d.suevent;render();return;}
   if('bkevent'in d){window.__bkEvent=d.bkevent;render();return;}
+  if('clearme'in d){clearMe();return;}
+  if('clearevsignups'in d){if(confirm('Clear sign-ups and bracket for this event?')){await sb.from('matches').delete().eq('event_id',d.clearevsignups);await sb.from('bracket_signups').delete().eq('event_id',d.clearevsignups);await sb.from('scores').delete().eq('event_id',d.clearevsignups).like('note','[%');await upd('events',d.clearevsignups,{status:'not_started'});await loadAndRender();toast('Event cleared');}return;}
   if('votemode'in d){window.__voteAdmin=d.votemode==='admin';render();return;}
 
   if('act'in d){await handleAct(d.act);return;}
@@ -517,24 +527,30 @@ document.addEventListener('click',async e=>{
 });
 
 /* ---------- action handlers ---------- */
+async function delAll(t){const{error}=await sb.from(t).delete().neq('id','00000000-0000-0000-0000-000000000000');if(error)toast(error.message,'err');}
 async function handleAct(act){
   if(act==='launchTV')launchFS('tv');
   else if(act==='launchAwards')launchFS('awards');
   else if(act==='exportAll'){const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download='ofsc_backup.json';a.click();toast('Backup downloaded');}
+  else if(act==='resetStatuses'){if(confirm('Reset all event & schedule statuses to Not started?')){for(const e of state.events)await upd('events',e.id,{status:'not_started'});for(const b of state.schedule)await upd('schedule_blocks',b.id,{status:'not_started'});await upd('settings',1,{current_event_id:null,next_event_id:null});await loadAndRender();toast('Statuses reset');}}
+  else if(act==='clearBrackets'){if(confirm('Delete ALL brackets? (Sign-ups stay.)')){await delAll('matches');await sb.from('scores').delete().like('note','[%');for(const e of state.events)if(e.is_bracket)await upd('events',e.id,{status:'not_started'});await loadAndRender();toast('Brackets cleared');}}
+  else if(act==='clearSignups'){if(confirm('Delete ALL sign-ups AND brackets?')){await delAll('matches');await delAll('bracket_signups');await sb.from('scores').delete().like('note','[%');await loadAndRender();toast('Sign-ups cleared');}}
+  else if(act==='clearScores'){if(confirm('Delete ALL scores? This zeroes the standings.')){await delAll('scores');await loadAndRender();toast('Scores cleared');}}
+  else if(act==='clearVotes'){if(confirm('Delete ALL votes?')){await delAll('votes');await loadAndRender();toast('Votes cleared');}}
 }
 function openMore(){const items=nav();openModal('Menu',items.map(n=>`<button class="btn block ghost" data-nav="${n[0]}" style="justify-content:flex-start;margin-bottom:8px"><span style="margin-right:8px">${n[1]}</span>${n[2]}</button>`).join(''),`<button class="btn ghost" data-close>Close</button>`);$('#modalRoot').addEventListener('click',ev=>{if(ev.target.closest('[data-nav]'))closeModal();},{once:true});}
 
 async function doLogin(){const email=$('#loginEmail').value.trim();const pass=$('#loginPass').value;const{error}=await sb.auth.signInWithPassword({email,password:pass});if(error){toast(error.message,'err');return;}toast('Signed in');}
 
 async function doSignup(eventId){
-  const ev=evById(eventId);const p1=$('#suP1').value;const p2=ev.bracket_size===2?$('#suP2').value:null;const name=$('#suName').value.trim();
+  const ev=evById(eventId);const p1=$('#suP1').value;const p2=ev.bracket_size===2?$('#suP2').value:null;
   if(!p1){toast('Pick '+(ev.bracket_size===1?'yourself':'player 1'),'err');return;}
   if(ev.bracket_size===2&&!p2){toast('Pick a teammate','err');return;}
   if(ev.bracket_size===2&&p1===p2){toast('Two different people, please','err');return;}
   const exists=state.signups.some(s=>s.event_id===eventId&&[s.player1_id,s.player2_id].some(x=>x===p1||(p2&&x===p2)));
   if(exists){toast('Someone in this pair is already signed up for this event','err');return;}
-  const ok=await ins('bracket_signups',{event_id:eventId,player1_id:p1,player2_id:p2,pair_name:name});
-  if(ok){await loadAndRender();toast('Signed up! Good luck.');}
+  const ok=await ins('bracket_signups',{event_id:eventId,player1_id:p1,player2_id:p2,pair_name:''});
+  if(ok){setMe(p1);await loadAndRender();toast('Signed up! Good luck.');}
 }
 
 /* scoring saves */
