@@ -102,7 +102,7 @@ async function rpc(fn,args){const{error}=await sb.rpc(fn,args);if(error){toast(e
 /* ================= NAV ================= */
 function nav(){
   const votingLive=state.awards.some(a=>a.award_type==='vote'&&a.is_open);
-  const guestN=[['home','🏟️','Home'],['know','🧭','What to Know'],['bring','🎒','Bring List'],['report','🏆','My Events'],['signup','✍️','Sign Up'],['sched','📅','Schedule'],['rules','📜','Rules'],['standings','🏅','Standings'],['brackets','🎾','Brackets'],['teams','🚩','My Team']];
+  const guestN=[['home','🏟️','Home'],['know','🧭','What to Know'],['bring','🎒','Bring List'],['report','🏆','My Events'],['signup','✍️','Sign Up'],['guests','👥','Guest List'],['sched','📅','Schedule'],['rules','📜','Rules'],['standings','🏅','Standings'],['brackets','🎾','Brackets'],['teams','🚩','My Team']];
   if(votingLive||isHost())guestN.push(['vote','🗳️','Vote']);
   const disp=[['dstand','📺','Standings'],['dbrack','📺','Brackets'],['dresults','📺','Recent Results']];
   const host=isHost()
@@ -239,7 +239,10 @@ VIEWS.sched=function(){
   ${state.schedule.map(b=>{
     const live=b.status==='now_playing';
     return `<div class="card" style="padding:13px 16px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
-      <div class="disp" style="font-weight:900;font-size:21px"><span style="color:var(--red)">${esc(b.time_label)}</span> — ${esc(b.title)}</div>
+      <div style="min-width:0;flex:1">
+        <div class="disp" style="font-weight:900;font-size:21px"><span style="color:var(--red)">${esc(b.time_label)}</span> — ${esc(b.title)}</div>
+        ${b.subtitle?`<div class="mut" style="font-size:12.5px;margin-top:3px;line-height:1.4">${esc(b.subtitle)}</div>`:''}
+      </div>
       <div class="inline">${live?'<span class="sticker">● Live</span>':`<span class="tag">${(STATUS.find(s=>s[0]===b.status)||STATUS[0])[1]}</span>`}
       ${isHost()?`<select class="selp" data-blockstatus="${b.id}">${STATUS.map(s=>`<option value="${s[0]}" ${b.status===s[0]?'selected':''}>${s[1]}</option>`).join('')}</select>`:''}</div>
     </div>`;}).join('')}`;
@@ -317,7 +320,7 @@ VIEWS.teams=function(){
   </div>
   <div class="card" style="margin-top:14px">
     <div class="cardhdr" style="font-size:17px"><span class="medallion"></span>Members (${members.length})</div>
-    ${members.map(g=>`<div class="member"><input value="${esc(g.display_name)}" data-mname="${g.id}"><button class="btn xs ghost" data-msave="${g.id}">Save</button></div>`).join('')||'<div class="mut small">No members assigned yet.</div>'}
+    ${members.map(g=>`<div class="member"><input value="${esc(g.display_name)}" data-mname="${g.id}">${g.kind==='kid'?`<input type="number" inputmode="numeric" min="0" max="17" placeholder="age" value="${g.age!=null?g.age:''}" data-mage="${g.id}" style="flex:0 0 62px;border:2px solid var(--line);border-radius:9px;padding:8px 6px;font-size:14px;font-weight:600;text-align:center">`:''}<button class="btn xs ghost" data-msave="${g.id}">Save</button></div>`).join('')||'<div class="mut small">No members assigned yet.</div>'}
     ${isHost()?`<button class="btn tealb sm" data-addguest="${t.id}" style="margin-top:12px">+ Add member</button>`:''}
   </div>`;
 };
@@ -405,6 +408,34 @@ VIEWS.bring=function(){
   ${me?`<div class="inline" style="justify-content:space-between;margin-bottom:12px"><span class="sticker tealbg">Claiming as ${esc(teamName(myTeamId))}</span><button class="btn xs ghost" data-clearme>Not you?</button></div>`
      :`<div class="card goldtrim" style="margin-bottom:14px"><label class="f" style="margin:0"><span>Who are you? (so we know which team is bringing it)</span><select class="i" data-voter><option value="">— select your name —</option>${state.guests.map(g=>`<option value="${g.id}">${esc(g.display_name)}</option>`).join('')}</select></label></div>`}
   ${cards}`;
+};
+
+/* ---------- GUEST LIST ---------- */
+VIEWS.guests=function(){
+  const adults=state.guests.filter(g=>g.kind!=='kid');
+  const kids=state.guests.filter(g=>g.kind==='kid');
+  const teams=state.teams.slice().sort((a,b)=>a.name.localeCompare(b.name));
+  const chip=g=>{
+    const isKid=g.kind==='kid';
+    return `<span class="tag" style="font-size:12.5px;padding:5px 10px;${isKid?'background:#EAF6F7;border-color:#9AD4DC;color:#0F6E7A':''}">${esc(g.display_name)}${isKid?` · ${g.age!=null?g.age:'?'}`:''}</span>`;
+  };
+  const cards=teams.map(t=>{
+    const members=state.guests.filter(g=>g.team_id===t.id);
+    if(!members.length)return '';
+    const a=members.filter(g=>g.kind!=='kid'),k=members.filter(g=>g.kind==='kid');
+    return `<div class="card">
+      <div class="cardhdr" style="font-size:17px;margin-bottom:8px"><span class="swatch" style="width:18px;height:18px;background:${t.color}"></span>${esc(t.name)}<span class="mut small" style="font-weight:600;margin-left:auto">${members.length} member${members.length===1?'':'s'}</span></div>
+      ${a.length?`<div class="rlab" style="margin-top:4px">Adults</div><div class="inline" style="gap:6px">${a.map(chip).join('')}</div>`:''}
+      ${k.length?`<div class="rlab">Kids <span style="color:var(--ink2);font-weight:600">(age)</span></div><div class="inline" style="gap:6px">${k.map(chip).join('')}</div>`:''}
+    </div>`;
+  }).join('');
+  return `${banner('Scout your competition','Guest List','See who’s coming — and start thinking about tournament partners. Pairs don’t need to be from the same team.')}
+  <div class="card goldtrim" style="margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between">
+    <div class="disp" style="font-weight:900;font-size:19px">${state.guests.length} guests · ${adults.length} adults · ${kids.length} kids</div>
+    <button class="btn tealb sm" data-nav="signup">✍️ Found a partner? Sign up</button>
+  </div>
+  ${cards}
+  <div class="cnote"><b>Committee note:</b> Kids’ ages are shown so events can be matched fairly. A “?” means the age hasn’t been added yet — any family member can fix it on the My Team page.</div>`;
 };
 
 /* ---------- RULES ---------- */
@@ -980,7 +1011,21 @@ document.addEventListener('click',async e=>{
   if('tmcolor'in d){window.__tmColor=d.tmcolor;document.querySelectorAll('[data-tmcolor]').forEach(x=>x.style.outline='none');el.style.outline='3px solid var(--navy)';el.style.outlineOffset='3px';return;}
   if('tmsave'in d){const ok=await rpc('rpc_update_team',{p_team:d.tmsave,p_name:$('#tmName').value,p_color:window.__tmColor||null,p_song:$('#tmSong').value,p_flag:null});if(ok){window.__tmColor=null;await loadAndRender();toast('Team saved');}return;}
   if('tmflag'in d){$('#tmFlagFile').click();return;}
-  if('msave'in d){const inp=document.querySelector(`[data-mname="${d.msave}"]`);const ok=await rpc('rpc_rename_guest',{p_guest:d.msave,p_name:inp.value});if(ok){await loadAndRender();toast('Name saved');}return;}
+  if('msave'in d){
+    const inp=document.querySelector(`[data-mname="${d.msave}"]`);
+    const ok=await rpc('rpc_rename_guest',{p_guest:d.msave,p_name:inp.value});
+    if(!ok)return;
+    const ageInp=document.querySelector(`[data-mage="${d.msave}"]`);
+    if(ageInp){
+      const v=ageInp.value.trim();
+      const cur=guest(d.msave)?.age;
+      const next=v===''?null:parseInt(v);
+      if((next??null)!==(cur??null)){
+        const ok2=await rpc('rpc_set_age',{p_guest:d.msave,p_age:isNaN(next)?null:next});
+        if(!ok2)return;
+      }
+    }
+    await loadAndRender();toast('Saved');return;}
   if('addguest'in d){addGuestModal(d.addguest);return;}
   if('saveguest'in d){const rec={display_name:$('#agN').value.trim()||'Guest',family:team(d.saveguest)?.family||'',kind:$('#agK').value,team_id:d.saveguest};if(await ins('guests',rec)){closeModal();await loadAndRender();toast('Member added');}return;}
 
