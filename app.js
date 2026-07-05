@@ -99,7 +99,7 @@ async function rpc(fn,args){const{error}=await sb.rpc(fn,args);if(error){toast(e
 /* ================= NAV ================= */
 function nav(){
   const votingLive=state.awards.some(a=>a.award_type==='vote'&&a.is_open);
-  const guestN=[['home','🏟️','Home'],['report','🏆','My Events'],['signup','✍️','Sign Up'],['sched','📅','Schedule'],['rules','📜','Rules'],['standings','🏅','Standings'],['brackets','🎾','Brackets'],['teams','🚩','My Team']];
+  const guestN=[['home','🏟️','Home'],['know','🧭','What to Know'],['report','🏆','My Events'],['signup','✍️','Sign Up'],['sched','📅','Schedule'],['rules','📜','Rules'],['standings','🏅','Standings'],['brackets','🎾','Brackets'],['teams','🚩','My Team']];
   if(votingLive||isHost())guestN.push(['vote','🗳️','Vote']);
   const disp=[['dstand','📺','Standings'],['dbrack','📺','Brackets'],['dresults','📺','Recent Results']];
   const host=isHost()
@@ -144,6 +144,7 @@ VIEWS.home=function(){
   const me=getMe();
   const myCount=me?state.signups.filter(s=>s.player1_id===me||s.player2_id===me).length:0;
   return `${banner(me?('★ Welcome back, '+esc(guestName(me))+' ★'):'★ The Inaugural ★', state.settings.event_name||'OFSC Olympics', esc(state.settings.date_label||''))}
+  <button class="btn goldb block" data-nav="know" style="margin-bottom:12px">🧭 First time here? Read “What to Know” before the party →</button>
   <div class="card goldtrim" style="margin-bottom:14px">
     <div class="cardhdr"><span class="medallion"></span>Quick links</div>
     <div class="grid g4" style="gap:10px">
@@ -316,6 +317,53 @@ VIEWS.teams=function(){
     ${members.map(g=>`<div class="member"><input value="${esc(g.display_name)}" data-mname="${g.id}"><button class="btn xs ghost" data-msave="${g.id}">Save</button></div>`).join('')||'<div class="mut small">No members assigned yet.</div>'}
     ${isHost()?`<button class="btn tealb sm" data-addguest="${t.id}" style="margin-top:12px">+ Add member</button>`:''}
   </div>`;
+};
+
+/* ---------- WHAT TO KNOW (pre-party info) ---------- */
+VIEWS.know=function(){
+  return `${banner('Read this before you arrive','What to Know','Everything you need before the 2026 Family Olympics.')}
+
+  <div class="card goldtrim">
+    <div class="cardhdr"><span class="medallion"></span>⏰ When things happen</div>
+    <p style="margin:0 0 6px;font-size:14.5px;line-height:1.5">We begin around <b>10:00 AM</b> — but you're welcome to join anytime.</p>
+    <p style="margin:0 0 6px;font-size:14.5px;line-height:1.5">For tournament games (Cornhole, Tetherball, KanJam, Spikeball, Bocce), <b>Championship matches begin around 1:30 PM</b>. Before then it's <b>open bracket play</b> — find your opponent, play your match, and report the winner in the app.</p>
+    <button class="btn ghost sm" data-nav="sched" style="margin-top:4px">📅 See the full schedule</button>
+  </div>
+
+  <div class="card">
+    <div class="cardhdr"><span class="medallion"></span>🍗 Food</div>
+    <div class="rlab">What to bring</div>
+    <p style="margin:0 0 8px;font-size:14px;line-height:1.5">We're asking guests to bring <b>snacks</b> — chips, fruit, desserts — and whatever else you'd like. We'll provide water.</p>
+    <div class="rlab">Lunch</div>
+    <p style="margin:0 0 8px;font-size:14px;line-height:1.5">Mini sandwiches and Uncrustables, alongside the snacks everyone brings.</p>
+    <div class="rlab">Dinner</div>
+    <p style="margin:0;font-size:14px;line-height:1.5">Fried chicken, mac and cheese, green beans, and Caesar salad.</p>
+  </div>
+
+  <div class="card">
+    <div class="cardhdr"><span class="medallion"></span>🚩 Team name &amp; flag</div>
+    <p style="margin:0 0 8px;font-size:14px;line-height:1.5">Every team is asked to <b>pick a team name</b> and <b>bring a designed flag</b> on the day. You can also upload a photo of your flag in the app if you'd like it on the big screen.</p>
+    <p style="margin:0 0 10px;font-size:14px;line-height:1.5">Want a blank canvas to work from? We recommend <a href="https://www.amazon.com/dp/B0CLLKTRXX" target="_blank" rel="noopener">this blank flag on Amazon</a>.</p>
+    <button class="btn sunsetb sm" data-nav="teams">🚩 Set your team name &amp; upload your flag</button>
+  </div>
+
+  <div class="card">
+    <div class="cardhdr"><span class="medallion"></span>🪑 What to bring</div>
+    <p style="margin:0;font-size:14.5px;line-height:1.5"><b>Please bring lawn chairs.</b> Also recommended: sunscreen, a water bottle, and whatever level of competitive spirit you can live with afterward.</p>
+  </div>
+
+  <div class="card goldtrim">
+    <div class="cardhdr"><span class="medallion"></span>🙋 Participation (totally optional)</div>
+    <ul style="margin:0;padding-left:20px;font-size:14px;line-height:1.6">
+      <li><b>No one is required to participate in anything.</b> Teams can compete or just watch — both are honorable.</li>
+      <li>Individual participation benefits your team — every point you earn rolls into your family's total.</li>
+      <li>Teams will have a few chances to enter events together.</li>
+      <li>For tournament play, <b>make your own pairs</b> — your partner does <i>not</i> need to be from your team.</li>
+    </ul>
+    <button class="btn tealb sm" data-nav="signup" style="margin-top:10px">✍️ Sign up for events</button>
+  </div>
+
+  <div class="cnote" style="margin-top:2px"><b>Committee note:</b> Arriving on time is appreciated. Arriving with dessert is remembered.</div>`;
 };
 
 /* ---------- RULES ---------- */
