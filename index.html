@@ -3,21 +3,26 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>OFSC Olympics — Command Center</title>
+<title>OFSC Family Olympics</title>
+<link rel="icon" href="logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800;900&family=Alfa+Slab+One&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 <div id="shell">
   <div class="topbar">
-    <div class="brandmark">O</div>
-    <div class="brandtxt"><b id="topName">OFSC OLYMPICS</b><small>Command Center</small></div>
+    <img class="loGo" src="logo.png" alt="OFSC logo">
+    <div class="brandtxt">
+      <span class="pre">★ The Inaugural ★</span>
+      <b id="topName">OFSC Family Olympics</b>
+    </div>
     <div class="clock"><div class="t" id="clockT">--:--</div><div class="d" id="clockD">—</div></div>
   </div>
+  <div class="sunstrip sunset slats"></div>
   <div class="layout">
     <nav class="rail" id="rail"></nav>
-    <main id="view"><div class="empty"><div class="big">Loading the arena…</div></div></main>
+    <main id="view"><div class="empty"><div class="big">Lighting the torch…</div></div></main>
   </div>
 </div>
 <nav class="tabbar" id="tabbar"></nav>
@@ -25,7 +30,6 @@
 <div id="fs"></div>
 <div id="toast"></div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
 <script src="app.js"></script>

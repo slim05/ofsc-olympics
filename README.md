@@ -25,8 +25,8 @@ No build step, no server, no secret keys in the browser.
 
 ## One-time setup
 
-1. **Database.** In Supabase → SQL Editor, run `supabase-schema.sql`, then
-   `rls-authenticated.sql`. (Schema first, then the host-access grants.)
+1. **Database.** In Supabase → SQL Editor, run `supabase-schema.sql`, then `rls-authenticated.sql`,
+   then `rpc-guest-actions.sql`. (Schema first, then host grants, then guest actions.)
 2. **Host login.** Supabase Dashboard → **Authentication → Users → Add user**. Enter an
    email + password for yourself (and one for Mallory if you like) and check
    **Auto Confirm User**. That's the login you'll use on the Host screen.
@@ -58,3 +58,5 @@ No build step, no server, no secret keys in the browser.
 - `app.js` — the whole application
 - `supabase-schema.sql` — tables, security, realtime, seed data (15 teams, events, awards)
 - `rls-authenticated.sql` — grants your host login write access
+- `rpc-guest-actions.sql` — secure functions: guests report winners, edit their team
+- `logo.png` — the OFSC logo used in the header and big displays
