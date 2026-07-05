@@ -88,7 +88,7 @@ function individualStandings(kidsOnly){
     .filter(x=>x.points>0).sort((a,b)=>b.points-a.points||a.g.display_name.localeCompare(b.g.display_name));
 }
 function signupLabel(su){if(!su)return 'BYE';const p1=guestName(su.player1_id);const p2=su.player2_id?guestName(su.player2_id):'';return p2?`${p1} & ${p2}`:p1;}
-const scLabel=t=>({placement:'Placement',head2head:'Head-to-Head',best:'Best Attempt',timed:'Timed Race',manual:'Manual'}[t]||t);
+const scLabel=t=>({placement:'Placement',head2head:'Head-to-Head',best:'Best Attempt',timed:'Timed Race',manual:'Manual',squad:'Squad Battle',team_vs:'Team vs Team',skills:'Skills Placement'}[t]||t);
 
 /* ---------------- DB writes (host via RLS; guests via RPC) ---------------- */
 async function ins(t,row){const{error}=await sb.from(t).insert(row);if(error){toast(error.message,'err');return false;}return true;}
@@ -98,12 +98,14 @@ async function rpc(fn,args){const{error}=await sb.rpc(fn,args);if(error){toast(e
 
 /* ================= NAV ================= */
 function nav(){
-  const guestN=[['home','🏟️','Home'],['report','🏆','My Events'],['signup','✍️','Sign Up'],['sched','📅','Schedule'],['standings','🏅','Standings'],['brackets','🎾','Brackets'],['teams','🚩','My Team'],['vote','🗳️','Vote']];
+  const votingLive=state.awards.some(a=>a.award_type==='vote'&&a.is_open);
+  const guestN=[['home','🏟️','Home'],['report','🏆','My Events'],['signup','✍️','Sign Up'],['sched','📅','Schedule'],['standings','🏅','Standings'],['brackets','🎾','Brackets'],['teams','🚩','My Team']];
+  if(votingLive||isHost())guestN.push(['vote','🗳️','Vote']);
   const disp=[['dstand','📺','Standings'],['dbrack','📺','Brackets'],['dresults','📺','Recent Results']];
   const host=isHost()
     ?[['score','🎯','Scoring Table'],['awards','🏆','Awards'],['admin','⚙️','Admin']]
     :[['admin','🔑','Host Login']];
-  return {guestN,disp,host};
+  return {guestN,disp,host,votingLive};
 }
 function renderNav(){
   const n=nav();
@@ -112,7 +114,8 @@ function renderNav(){
     `<div class="railgroup"><span class="st">★</span> Guest</div>`+n.guestN.map(b).join('')+
     `<div class="railgroup"><span class="st">★</span> Big Displays</div><div class="displays">`+n.disp.map(b).join('')+`</div>`+
     `<div class="railgroup"><span class="st">★</span> Host</div>`+n.host.map(b).join('');
-  const tabs=(isHost()?['home','score','brackets','standings','teams']:['home','report','brackets','standings','vote'])
+  const guestTabs=['home','report','brackets','standings',(n.votingLive?'vote':'sched')];
+  const tabs=(isHost()?['home','score','brackets','standings','teams']:guestTabs)
     .map(id=>{const all=[...n.guestN,...n.disp,...n.host];const x=all.find(y=>y[0]===id);return x?b(x):'';}).join('');
   $('#tabbar').innerHTML=tabs+`<button data-more><span class="ic">☰</span>More</button>`;
 }
@@ -137,26 +140,17 @@ function standRow(r,i,max){
 
 /* ---------- HOME ---------- */
 VIEWS.home=function(){
-  const cur=evById(state.settings.current_event_id), nxt=evById(state.settings.next_event_id);
   const st=teamStandings();const max=st[0]?st[0].points:0;
   const me=getMe();
+  const myCount=me?state.signups.filter(s=>s.player1_id===me||s.player2_id===me).length:0;
   return `${banner(me?('★ Welcome back, '+esc(guestName(me))+' ★'):'★ The Inaugural ★', state.settings.event_name||'OFSC Olympics', esc(state.settings.date_label||''))}
-  <div class="grid g2" style="margin-bottom:14px">
-    <div class="hero"><div class="disc sunset slats"></div>
-      <div class="now-label">▶ Now Competing</div>
-      <h2>${cur?esc(cur.name):'Intermission'}</h2>
-      <div class="sub">${cur?esc(cur.location||'Backyard Arena'):'Glory is temporary. Bragging rights are forever.'}</div>
-      <div style="margin-top:14px;display:flex;gap:10px;align-items:center;position:relative;flex-wrap:wrap">
-        ${cur?'<span class="sticker">● Live</span>':''}
-        ${nxt?`<span class="tag">Up next · ${esc(nxt.name)}</span>`:''}
-      </div>
-    </div>
-    <div class="card goldtrim"><div class="cardhdr"><span class="medallion"></span>${isHost()?'Host quick actions':'Your quick actions'}</div>
-      <div class="grid" style="gap:11px">
-      ${isHost()
-        ?`<button class="btn sunsetb block big" data-nav="score">🎯 Scoring Table</button><button class="btn tealb block" data-nav="brackets">🎾 Brackets</button><button class="btn ghost block" data-nav="awards">🏆 Awards</button>`
-        :`<button class="btn sunsetb block big" data-nav="report">🏆 Report a winner</button><button class="btn tealb block" data-nav="signup">✍️ Sign up</button><button class="btn ghost block" data-nav="vote">🗳️ Vote for awards</button>`}
-      </div>
+  <div class="card goldtrim" style="margin-bottom:14px">
+    <div class="cardhdr"><span class="medallion"></span>Quick links</div>
+    <div class="grid g4" style="gap:10px">
+      <button class="btn sunsetb block" data-nav="teams">🚩 My Team</button>
+      <button class="btn tealb block" data-nav="signup">✍️ Sign Up</button>
+      <button class="btn goldb block" data-nav="report">🏆 My Events${myCount?` (${myCount})`:''}</button>
+      <button class="btn block" data-nav="sched">📅 Schedule</button>
     </div>
   </div>
   <div class="card"><div class="cardhdr"><span class="medallion"></span>Top of the Podium</div>
@@ -207,19 +201,27 @@ VIEWS.report=function(){
 /* ---------- SIGN UP ---------- */
 VIEWS.signup=function(){
   const bes=state.events.filter(e=>e.is_bracket).sort((a,b)=>a.sort-b.sort);
-  const sel=window.__suEvent||(bes[0]&&bes[0].id);window.__suEvent=sel;
+  const skills=state.events.filter(e=>e.scoring_type==='skills').sort((a,b)=>a.sort-b.sort);
+  const all=[...bes,...skills];
+  const sel=window.__suEvent||(all[0]&&all[0].id);window.__suEvent=sel;
   const ev=evById(sel);const me=getMe();
   const mine=state.signups.filter(s=>s.event_id===sel);
-  const locked=ev?state.matches.some(m=>m.event_id===ev.id):false;
-  return `${banner('Grab a teammate','Event Sign Up','Only these five events need signups — everything else, just show up and play.')}
-  <div class="btnrow" style="margin-bottom:14px">${bes.map(e=>`<button class="btn sm ${e.id===sel?'sunsetb':'ghost'}" data-suevent="${e.id}">${esc(e.name)}${e.bracket_size===1?' (solo)':''}</button>`).join('')}</div>
+  const isSkills=ev&&ev.scoring_type==='skills';
+  const locked=ev?(!isSkills&&state.matches.some(m=>m.event_id===ev.id)):false;
+  const alreadyIn=me&&mine.some(s=>s.player1_id===me||s.player2_id===me);
+  return `${banner('Grab a teammate','Event Sign Up','Tournaments need a partner (Tetherball is solo). Skills challenges — just raise your hand.')}
+  <div class="eyebrow" style="margin-bottom:6px">Tournaments</div>
+  <div class="btnrow" style="margin-bottom:10px">${bes.map(e=>`<button class="btn sm ${e.id===sel?'sunsetb':'ghost'}" data-suevent="${e.id}">${esc(e.name)}${e.bracket_size===1?' (solo)':''}</button>`).join('')}</div>
+  <div class="eyebrow" style="margin-bottom:6px">Skills Challenges</div>
+  <div class="btnrow" style="margin-bottom:14px">${skills.map(e=>`<button class="btn sm ${e.id===sel?'tealb':'ghost'}" data-suevent="${e.id}">${esc(e.name)}</button>`).join('')}</div>
   ${ev?`<div class="card goldtrim">
-    <div class="cardhdr"><span class="medallion"></span>${esc(ev.name)} — ${ev.bracket_size===1?'singles':'pairs'}</div>
+    <div class="cardhdr"><span class="medallion"></span>${esc(ev.name)} — ${isSkills?'skills challenge':(ev.bracket_size===1?'singles':'pairs')}</div>
     ${locked?`<div class="pill warn" style="margin-bottom:10px">Bracket already drawn — see the hosts to be added</div>`:''}
-    <div class="mut small" style="margin-bottom:12px">${ev.bracket_size===1?'Sign up as yourself.':'Pick yourself and your teammate.'} ${mine.length} entrant${mine.length===1?'':'s'} so far.</div>
-    <label class="f"><span>${ev.bracket_size===1?'You':'Player 1 (you)'}</span><select class="i" id="suP1"><option value="">— select your name —</option>${state.guests.map(g=>`<option value="${g.id}" ${me===g.id?'selected':''}>${esc(g.display_name)}</option>`).join('')}</select></label>
-    ${ev.bracket_size===2?`<label class="f"><span>Player 2 (teammate)</span><select class="i" id="suP2"><option value="">— select —</option>${state.guests.map(g=>`<option value="${g.id}">${esc(g.display_name)}</option>`).join('')}</select></label>`:''}
-    <button class="btn sunsetb block big" data-dosignup="${ev.id}" ${locked?'disabled':''}>Sign up</button>
+    <div class="mut small" style="margin-bottom:12px">${isSkills?'Sign up solo — the hosts will score placements at the event.':(ev.bracket_size===1?'Sign up as yourself.':'Pick yourself and your teammate.')} ${mine.length} entrant${mine.length===1?'':'s'} so far.</div>
+    <label class="f"><span>${(isSkills||ev.bracket_size===1)?'You':'Player 1 (you)'}</span><select class="i" id="suP1"><option value="">— select your name —</option>${state.guests.map(g=>`<option value="${g.id}" ${me===g.id?'selected':''}>${esc(g.display_name)}</option>`).join('')}</select></label>
+    ${(!isSkills&&ev.bracket_size===2)?`<label class="f"><span>Player 2 (teammate)</span><select class="i" id="suP2"><option value="">— select —</option>${state.guests.map(g=>`<option value="${g.id}">${esc(g.display_name)}</option>`).join('')}</select></label>`:''}
+    ${alreadyIn?`<div class="pill ok" style="margin-bottom:10px">✓ You’re already in this one</div>`:''}
+    <button class="btn ${isSkills?'tealb':'sunsetb'} block big" data-dosignup="${ev.id}" ${locked?'disabled':''}>Sign up</button>
   </div>
   <div class="card" style="margin-top:14px"><div class="cardhdr" style="font-size:16px"><span class="medallion"></span>Signed up for ${esc(ev.name)}</div>
     ${mine.length?mine.map(s=>`<div class="row" style="padding:9px 12px"><div class="grow"><div class="name" style="font-size:14px">${esc(signupLabel(s))}</div></div>${isHost()?`<button class="btn xs danger" data-delsignup="${s.id}">✕</button>`:''}</div>`).join(''):'<div class="mut small">Be the first!</div>'}
@@ -318,6 +320,8 @@ VIEWS.teams=function(){
 
 /* ---------- VOTE ---------- */
 VIEWS.vote=function(){
+  const votingLive=state.awards.some(a=>a.award_type==='vote'&&a.is_open);
+  if(!isHost()&&!votingLive)return `${banner('Patience, athlete','Awards Voting')}<div class="empty"><div class="big">Voting hasn’t opened yet</div>The hosts will open the polls later in the day — check back after dinner.</div>`;
   if(isHost()&&window.__voteAdmin!==false)return votingAdminView();
   return `${isHost()?`<div class="btnrow" style="margin-bottom:12px"><button class="btn sm ghost" data-votemode="admin">Admin control</button><button class="btn sm sunsetb" data-votemode="guest">Ballot preview</button></div>`:''}${guestBallotView()}`;
 };
@@ -361,7 +365,7 @@ VIEWS.score=function(){
     <label class="f" style="margin:0;min-width:280px;flex:1;max-width:420px"><span>Event</span>
       <select class="i" data-scselect>${evs.map(e=>`<option value="${e.id}" ${e.id===sel?'selected':''}>${esc(e.name)} · ${scLabel(e.scoring_type)}${e.status==='complete'?' ✓':''}</option>`).join('')}</select></label>
     <label class="f" style="margin:0"><span>Scoring type</span>
-      <select class="i" data-sctype="${ev.id}">${['placement','head2head','best','timed','manual'].map(t=>`<option value="${t}" ${ev.scoring_type===t?'selected':''}>${scLabel(t)}</option>`).join('')}</select></label>
+      <select class="i" data-sctype="${ev.id}">${['placement','head2head','squad','team_vs','skills','best','timed','manual'].map(t=>`<option value="${t}" ${ev.scoring_type===t?'selected':''}>${scLabel(t)}</option>`).join('')}</select></label>
   </div>
   <div class="card goldtrim">${scoreForm(ev)}</div>
   <div class="card" style="margin-top:14px">
@@ -372,6 +376,50 @@ VIEWS.score=function(){
   <div class="card" style="margin-top:14px"><div class="cardhdr" style="font-size:16px"><span class="medallion"></span>⭐ Bonus / penalty points</div>${bonusForm()}</div>`;
 };
 function scoreForm(ev){
+  if(ev.scoring_type==='squad'){
+    const q=(window.__sqQ||'').toLowerCase();
+    const picks=window.__sqPicks||(window.__sqPicks={});
+    const shown=state.guests.filter(g=>!q||(g.display_name+' '+g.family).toLowerCase().includes(q));
+    const aCount=Object.values(picks).filter(v=>v==='a').length;
+    const bCount=Object.values(picks).filter(v=>v==='b').length;
+    return `<div class="mut small" style="margin-bottom:10px">Tap A or B next to everyone who played. Winning side: <b>10 pts each</b> · losing side: <b>5 pts each</b>.</div>
+    <input class="i" placeholder="Search players…" value="${esc(window.__sqQ||'')}" data-sqsearch style="margin-bottom:10px">
+    <div style="max-height:340px;overflow:auto;border:2px solid var(--line);border-radius:12px;padding:6px">
+    ${shown.map(g=>{const v=picks[g.id]||'';return `<div class="member" style="border-bottom:1.5px dashed var(--line)">
+      <div style="flex:1;min-width:0;font-weight:700;font-size:14px">${esc(g.display_name)} <span class="mut small">· ${esc(g.family)}</span></div>
+      <button class="btn xs ${v==='a'?'sunsetb':'ghost'}" data-sqpick="${g.id}|a">A</button>
+      <button class="btn xs ${v==='b'?'tealb':'ghost'}" data-sqpick="${g.id}|b">B</button>
+    </div>`;}).join('')}</div>
+    <div class="inline" style="margin:12px 0 8px;justify-content:space-between"><span class="tag">Side A · ${aCount} players</span><span class="tag">Side B · ${bCount} players</span></div>
+    <small style="font-family:var(--disp);letter-spacing:.12em;color:var(--ink2);font-weight:800">WHO WON?</small>
+    <div class="btnrow" style="margin:8px 0 14px">
+      <button class="btn ${window.__sqWin==='a'?'sunsetb':'ghost'}" data-sqwin="a">Side A won</button>
+      <button class="btn ${window.__sqWin==='b'?'tealb':'ghost'}" data-sqwin="b">Side B won</button>
+    </div>
+    <div class="btnrow"><button class="btn goldb big" data-savesquad="${ev.id}">Save — award 10 / 5</button><button class="btn ghost" data-undoscore="${ev.id}">↶ Undo last save</button></div>`;
+  }
+  if(ev.scoring_type==='team_vs'){
+    return `<div class="mut small" style="margin-bottom:10px">Pick the two teams, then the winner. Winning team: <b>10 pts each member</b> · losing team: <b>5 pts each member</b>.</div>
+    <div class="grid g2">
+      <label class="f"><span>Team 1</span><select class="i" id="tvA"><option value="">—</option>${state.teams.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select></label>
+      <label class="f"><span>Team 2</span><select class="i" id="tvB"><option value="">—</option>${state.teams.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select></label>
+    </div>
+    <div class="btnrow" style="margin-bottom:14px">
+      <button class="btn ${window.__tvWin==='a'?'sunsetb':'ghost'}" data-tvwin="a">Team 1 won</button>
+      <button class="btn ${window.__tvWin==='b'?'tealb':'ghost'}" data-tvwin="b">Team 2 won</button>
+    </div>
+    <div class="btnrow"><button class="btn goldb big" data-saveteamvs="${ev.id}">Save — award 10 / 5</button><button class="btn ghost" data-undoscore="${ev.id}">↶ Undo last save</button></div>`;
+  }
+  if(ev.scoring_type==='skills'){
+    const entrants=state.signups.filter(s=>s.event_id===ev.id);
+    if(!entrants.length)return `<div class="empty"><div class="big">No sign-ups yet</div>Players raise their hand on the Sign Up page — then they appear here to place.</div>`;
+    return `<div class="mut small" style="margin-bottom:10px">Everyone signed up is listed. Set 1st (${P().first}), 2nd (${P().second}), 3rd (${P().third}) — everyone else entered gets ${P().participation} for participating.</div>
+    <table class="scoretbl"><thead><tr><th>Competitor</th><th>Place</th></tr></thead><tbody>
+    ${entrants.map(s=>`<tr><td><b>${esc(guestName(s.player1_id))}</b> <span class="mut small">· ${esc(guest(s.player1_id)?.family||'')}</span></td>
+      <td><select class="selp skills-sel" data-guest="${s.player1_id}"><option value="">entered</option><option value="1">1st</option><option value="2">2nd</option><option value="3">3rd</option></select></td></tr>`).join('')}
+    </tbody></table>
+    <div class="btnrow" style="margin-top:14px"><button class="btn goldb big" data-saveskills="${ev.id}">Save placements</button><button class="btn ghost" data-undoscore="${ev.id}">↶ Undo last save</button></div>`;
+  }
   if(ev.scoring_type==='placement'||ev.scoring_type==='head2head'){
     const h2h=ev.scoring_type==='head2head';
     const note=h2h?'Head-to-head: set the winner to 1st. Every team you mark gets points; unmarked teams get nothing (or use Participation).'
@@ -406,12 +454,22 @@ function bonusForm(){
 function eventResults(eid){
   const rows=state.scores.filter(s=>s.event_id===eid).slice().reverse();
   const seen=new Set();const compact=[];
-  rows.forEach(s=>{const key=(s.team_id||'')+'|'+(s.place||'')+'|'+(s.note||'');if(s.team_id&&s.guest_id){if(seen.has(key))return;seen.add(key);compact.push({...s,grouped:true});}else compact.push(s);});
+  rows.forEach(s=>{
+    const noteKey=(s.note||'');
+    if(s.team_id&&s.guest_id){const key='t|'+s.team_id+'|'+(s.place||'')+'|'+noteKey;if(seen.has(key))return;seen.add(key);
+      compact.push({...s,label:teamName(s.team_id)+' (all members)',delArg:s.id+'|'+s.team_id+'|'+(s.place||'')+'|'+encodeURIComponent(noteKey)});}
+    else if(s.guest_id&&/^\[batch:/.test(noteKey)){const key='n|'+(s.place||'')+'|'+(s.points||'')+'|'+noteKey;
+      const n=rows.filter(x=>x.guest_id&&(x.note||'')===noteKey&&x.place===s.place&&x.points===s.points).length;
+      if(n>1){if(seen.has(key))return;seen.add(key);
+        compact.push({...s,label:'×'+n+' players',delArg:s.id+'|note|'+(s.place||'')+'|'+encodeURIComponent(noteKey)});}
+      else compact.push({...s,label:guestName(s.guest_id),delArg:s.id});}
+    else compact.push({...s,label:s.guest_id?guestName(s.guest_id):teamName(s.team_id),delArg:s.id});
+  });
   if(!compact.length)return '<div class="mut small">No results yet.</div>';
   return compact.slice(0,30).map(s=>`<div class="row" style="padding:8px 12px"><div class="swatch" style="background:${s.team_id?(team(s.team_id)?.color||'#889'):'#889'}"></div>
-    <div class="grow"><div class="name" style="font-size:14px">${esc(s.grouped?teamName(s.team_id)+' (all members)':(s.guest_id?guestName(s.guest_id):teamName(s.team_id)))}</div>
+    <div class="grow"><div class="name" style="font-size:14px">${esc(s.label)}</div>
     <div class="meta">${s.place?ordinal(s.place)+' · ':''}${s.note?esc(String(s.note).replace(/^\[[^\]]+\]\s*/,''))+' · ':''}${s.points>=0?'+':''}${s.points} pts each</div></div>
-    <button class="btn xs danger" data-delscore="${s.id}${s.grouped?'|'+s.team_id+'|'+(s.place||'')+'|'+encodeURIComponent(s.note||''):''}" title="Remove">✕</button></div>`).join('');
+    <button class="btn xs danger" data-delscore="${s.delArg}" title="Remove">✕</button></div>`).join('');
 }
 
 /* ---------- AWARDS (host) ---------- */
@@ -556,6 +614,13 @@ async function setMatchResult(matchId,winnerSignupId,aScore,bScore){
 }
 
 /* ================= interactions ================= */
+document.addEventListener('input',e=>{
+  const t=e.target;
+  if(t.matches('[data-sqsearch]')){window.__sqQ=t.value;
+    // re-render only the list to keep focus
+    const ev=evById(window.__scEvent);if(ev){const card=t.closest('.card');if(card){const pos=t.selectionStart;card.innerHTML=scoreForm(ev);const nt=card.querySelector('[data-sqsearch]');if(nt){nt.focus();nt.setSelectionRange(pos,pos);}}}}
+});
+
 document.addEventListener('change',async e=>{
   const t=e.target;
   if(t.matches('[data-scselect]')){window.__scEvent=t.value;render();}
@@ -570,7 +635,7 @@ document.addEventListener('change',async e=>{
 });
 
 document.addEventListener('click',async e=>{
-  const el=e.target.closest('[data-nav],[data-more],[data-close],[data-act],[data-lb],[data-suevent],[data-dosignup],[data-delsignup],[data-bkevent],[data-genbracket],[data-seedbracket],[data-clearevsignups],[data-matchresult],[data-shuffleseed],[data-seedmove],[data-dogenerate],[data-submitresult],[data-reppick],[data-repsubmit],[data-savetable],[data-savebest],[data-addbest],[data-savemanual],[data-savebonus],[data-completeevent],[data-delscore],[data-undoscore],[data-votemode],[data-voteall],[data-awardopen],[data-awardwinner],[data-awardreset],[data-awardlock],[data-castvote],[data-savewinner],[data-clearme],[data-tmsave],[data-tmcolor],[data-tmflag],[data-msave],[data-addguest],[data-saveguest],[data-login],[data-logout],[data-export],[data-fsexit],[data-fsbk],[data-awardprev],[data-awardnext],[data-awardreveal]');
+  const el=e.target.closest('[data-nav],[data-more],[data-close],[data-act],[data-lb],[data-suevent],[data-dosignup],[data-delsignup],[data-bkevent],[data-genbracket],[data-seedbracket],[data-clearevsignups],[data-matchresult],[data-shuffleseed],[data-seedmove],[data-dogenerate],[data-submitresult],[data-reppick],[data-repsubmit],[data-savetable],[data-savebest],[data-addbest],[data-savemanual],[data-savebonus],[data-sqpick],[data-sqwin],[data-savesquad],[data-tvwin],[data-saveteamvs],[data-saveskills],[data-completeevent],[data-delscore],[data-undoscore],[data-votemode],[data-voteall],[data-awardopen],[data-awardwinner],[data-awardreset],[data-awardlock],[data-castvote],[data-savewinner],[data-clearme],[data-tmsave],[data-tmcolor],[data-tmflag],[data-msave],[data-addguest],[data-saveguest],[data-login],[data-logout],[data-export],[data-fsexit],[data-fsbk],[data-awardprev],[data-awardnext],[data-awardreveal]');
   if(!el)return;const d=el.dataset;
 
   if('nav'in d){go(d.nav);return;}
@@ -609,6 +674,12 @@ document.addEventListener('click',async e=>{
   if('submitresult'in d){const wid=$('#resWinner').value;if(!wid){toast('Pick a winner','err');return;}const a=parseInt($('#resA').value),b=parseInt($('#resB').value);closeModal();await setMatchResult(d.submitresult,wid,isNaN(a)?null:a,isNaN(b)?null:b);return;}
 
   /* scoring table */
+  if('sqpick'in d){const[gid,side]=d.sqpick.split('|');const p=window.__sqPicks||(window.__sqPicks={});p[gid]=p[gid]===side?'':side;render();return;}
+  if('sqwin'in d){window.__sqWin=d.sqwin;render();return;}
+  if('savesquad'in d){await saveSquad(d.savesquad);return;}
+  if('tvwin'in d){window.__tvWin=d.tvwin;render();return;}
+  if('saveteamvs'in d){await saveTeamVs(d.saveteamvs);return;}
+  if('saveskills'in d){await saveSkills(d.saveskills);return;}
   if('savetable'in d){await saveTable(d.savetable);return;}
   if('savebest'in d){await saveBest(d.savebest);return;}
   if('addbest'in d){$('#bestRows').insertAdjacentHTML('beforeend',bestRow());return;}
@@ -692,6 +763,54 @@ async function awardTeamMembers(eventId,teamId,place,points,note){
   const rows=members.map(g=>({event_id:eventId,team_id:teamId,guest_id:g.id,points,place,note}));
   const{error}=await sb.from('scores').insert(rows);if(error)toast(error.message,'err');
 }
+async function saveSquad(eventId){
+  const picks=window.__sqPicks||{};const win=window.__sqWin;
+  const A=Object.keys(picks).filter(k=>picks[k]==='a'),B=Object.keys(picks).filter(k=>picks[k]==='b');
+  if(!A.length||!B.length){toast('Pick players for both sides','err');return;}
+  if(!win){toast('Tap who won','err');return;}
+  const evName=eventName(eventId);const tag='[batch:'+Date.now()+'] ';
+  const winners=win==='a'?A:B, losers=win==='a'?B:A;
+  const rows=[
+    ...winners.map(g=>({event_id:eventId,guest_id:g,points:10,place:1,note:tag+'Won '+evName})),
+    ...losers.map(g=>({event_id:eventId,guest_id:g,points:5,note:tag+evName+' — played'}))
+  ];
+  const{error}=await sb.from('scores').insert(rows);
+  if(error){toast(error.message,'err');return;}
+  window.__sqPicks={};window.__sqWin='';window.__sqQ='';
+  await loadAndRender();toast('Saved — '+winners.length+' winners (10) · '+losers.length+' players (5)');
+}
+async function saveTeamVs(eventId){
+  const a=$('#tvA').value,b=$('#tvB').value;const win=window.__tvWin;
+  if(!a||!b){toast('Pick both teams','err');return;}
+  if(a===b){toast('Two different teams, please','err');return;}
+  if(!win){toast('Tap who won','err');return;}
+  const evName=eventName(eventId);const tag='[batch:'+Date.now()+'] ';
+  const wTeam=win==='a'?a:b, lTeam=win==='a'?b:a;
+  const rows=[
+    ...state.guests.filter(g=>g.team_id===wTeam).map(g=>({event_id:eventId,team_id:wTeam,guest_id:g.id,points:10,place:1,note:tag+'Won '+evName})),
+    ...state.guests.filter(g=>g.team_id===lTeam).map(g=>({event_id:eventId,team_id:lTeam,guest_id:g.id,points:5,note:tag+evName+' — played'}))
+  ];
+  const{error}=await sb.from('scores').insert(rows);
+  if(error){toast(error.message,'err');return;}
+  window.__tvWin='';
+  await loadAndRender();toast(teamName(wTeam)+' wins! 10 each · '+teamName(lTeam)+' 5 each');
+}
+async function saveSkills(eventId){
+  const sels=[...document.querySelectorAll('.skills-sel')];
+  const placed={};let dup=false;
+  sels.forEach(s=>{if(s.value){if(placed[s.value])dup=true;placed[s.value]=s.dataset.guest;}});
+  if(dup){toast('Two people have the same place','err');return;}
+  const entrants=state.signups.filter(s=>s.event_id===eventId).map(s=>s.player1_id);
+  if(!entrants.length){toast('No entrants','err');return;}
+  const evName=eventName(eventId);const tag='[batch:'+Date.now()+'] ';
+  const placedIds=new Set(Object.values(placed));
+  const rows=[];
+  for(const[pl,gid]of Object.entries(placed))rows.push({event_id:eventId,guest_id:gid,place:+pl,points:placePoints(+pl),note:tag+ordinal(+pl)+' · '+evName});
+  entrants.filter(g=>!placedIds.has(g)).forEach(g=>rows.push({event_id:eventId,guest_id:g,points:P().participation,note:tag+evName+' — entered'}));
+  const{error}=await sb.from('scores').insert(rows);
+  if(error){toast(error.message,'err');return;}
+  await loadAndRender();toast('Placements saved — everyone entered got points');
+}
 async function saveTable(eventId){
   const sels=[...document.querySelectorAll('.place-sel')];
   const batchTag='[batch:'+Date.now()+'] ';
@@ -729,10 +848,16 @@ async function awardTarget(eventId,tgt,points,note){
   else await ins('scores',{event_id:eventId,guest_id:id,points,note});
 }
 async function deleteScore(arg){
-  const[id,teamId,place,noteEnc]=arg.split('|');
-  if(teamId!==undefined){ // grouped: remove all matching rows from that save
+  const parts=arg.split('|');
+  const[id,kind,place,noteEnc]=parts;
+  if(parts.length>1&&kind==='note'){ // grouped guest rows sharing a batch note
     const note=decodeURIComponent(noteEnc||'');
-    const q=sb.from('scores').delete().eq('team_id',teamId);
+    const q=sb.from('scores').delete().eq('note',note);
+    if(place)q.eq('place',+place);else q.is('place',null);
+    const{error}=await q;if(error)toast(error.message,'err');
+  } else if(parts.length>1){ // grouped team rows
+    const note=decodeURIComponent(noteEnc||'');
+    const q=sb.from('scores').delete().eq('team_id',kind);
     if(place)q.eq('place',+place);else q.is('place',null);
     if(note)q.eq('note',note);
     const{error}=await q;if(error)toast(error.message,'err');
