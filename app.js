@@ -99,7 +99,7 @@ async function rpc(fn,args){const{error}=await sb.rpc(fn,args);if(error){toast(e
 /* ================= NAV ================= */
 function nav(){
   const votingLive=state.awards.some(a=>a.award_type==='vote'&&a.is_open);
-  const guestN=[['home','🏟️','Home'],['report','🏆','My Events'],['signup','✍️','Sign Up'],['sched','📅','Schedule'],['standings','🏅','Standings'],['brackets','🎾','Brackets'],['teams','🚩','My Team']];
+  const guestN=[['home','🏟️','Home'],['report','🏆','My Events'],['signup','✍️','Sign Up'],['sched','📅','Schedule'],['rules','📜','Rules'],['standings','🏅','Standings'],['brackets','🎾','Brackets'],['teams','🚩','My Team']];
   if(votingLive||isHost())guestN.push(['vote','🗳️','Vote']);
   const disp=[['dstand','📺','Standings'],['dbrack','📺','Brackets'],['dresults','📺','Recent Results']];
   const host=isHost()
@@ -315,6 +315,182 @@ VIEWS.teams=function(){
     <div class="cardhdr" style="font-size:17px"><span class="medallion"></span>Members (${members.length})</div>
     ${members.map(g=>`<div class="member"><input value="${esc(g.display_name)}" data-mname="${g.id}"><button class="btn xs ghost" data-msave="${g.id}">Save</button></div>`).join('')||'<div class="mut small">No members assigned yet.</div>'}
     ${isHost()?`<button class="btn tealb sm" data-addguest="${t.id}" style="margin-top:12px">+ Add member</button>`:''}
+  </div>`;
+};
+
+/* ---------- RULES ---------- */
+const RULES={
+  tournaments:{title:'Tournament Events',sub:'Where confidence goes to be tested. Sign up in the app · single-elimination brackets · report your winner in the app when the game ends.',accent:'var(--red)',events:[
+    {id:'cornhole',name:'Cornhole',sub:'2-player teams',accent:'var(--red)',f:[
+      ['Goal','Score points by landing bags on the board or in the hole.'],
+      ['How to play','Each team throws 4 bags per round from behind the front of the board. Children 12 or under can throw from 5 steps in front of the board.'],
+      ['Scoring',['In the hole = 3 points','On the board = 1 point','Cancellation scoring applies'],'Example: if Team A scores 5 and Team B scores 3, Team A gets 2 points for the round.'],
+      ['How to win','First rounds play to <b>11</b>. Later rounds play to <b>21, win by 2</b>. Teams can go over 21 — the game does not end at 21 unless the team is ahead by at least 2.','Examples: 21–19 wins. 22–20 wins. 25–23 wins. 21–20 does not win. 23–22 does not win.'],
+      ['Time cap','<b>15 minutes.</b> If time runs out, the team in the lead wins. If tied, one sudden-death round decides it.'],
+      ['Important details',['Bags knocked in by an opponent count.','Bags that hit the ground first do not count.','Bags hanging off the board count only if they are not touching the ground.']]],
+      note:'If you refer to yourself as “a cornhole guy,” expectations rise immediately.'},
+    {id:'tetherball',name:'Tetherball',sub:'Singles',accent:'var(--orange)',f:[
+      ['Goal','Wrap the rope completely around the pole in your direction.'],
+      ['How to play','One player serves the ball around the pole. The other player tries to hit it back the opposite way.'],
+      ['How to win','<b>Best of 3 wraps.</b> A wrap counts when the rope is fully wrapped around the pole and the ball cannot go any farther.'],
+      ['Time cap','<b>8 minutes.</b> If time runs out, the player with the most wraps wins. If tied, one sudden-death wrap decides it.'],
+      ['You may not',['Catch, hold, or throw the ball.','Touch the rope or the pole.','Cross into your opponent’s side.']],
+      ['Penalty','First violation = replay. Second violation = lose the wrap.']],
+      note:'Everyone was apparently elite at tetherball in elementary school. Today, we verify.'},
+    {id:'kanjam',name:'KanJam',sub:'2-player teams',accent:'var(--gold)',f:[
+      ['Goal','Throw and deflect the disc to score points at the can.'],
+      ['How to play','Partners stand at opposite cans. One player throws. The partner may deflect the disc.'],
+      ['Scoring',['<b>Dinger</b> — deflected hit = 1 point','<b>Deucer</b> — unassisted hit = 2 points','<b>Bucket</b> — deflected into the can = 3 points','<b>Slot</b> — thrown directly into the slot = instant win']],
+      ['How to win','Reach <b>exactly 11</b>. If you go over 11, subtract the extra points from your score.','Example: if you have 10 and score 3, you go over by 2, so your score drops to 8.'],
+      ['Time cap','<b>12 minutes.</b> If time runs out, the team in the lead wins. If tied, one sudden-death throw decides it.']],
+      note:'A slot is an instant win. Yes, everyone will yell. Yes, it was probably mostly luck.'},
+    {id:'spikeball',name:'Spikeball',sub:'2-player teams',accent:'var(--teal)',f:[
+      ['Goal','Hit the ball onto the net so the other team cannot return it.'],
+      ['How to play','The serving team serves off the net. The receiving team has up to 3 touches to hit it back onto the net.'],
+      ['Scoring','Rally scoring applies — a point is scored on every serve, no matter who served.'],
+      ['How to win','<b>Game to 11, win by 2.</b>'],
+      ['Time cap','<b>12 minutes.</b> If time runs out, the team in the lead wins. If tied, one sudden-death point decides it.'],
+      ['Serve rule','If the ball hits the rim or rolls awkwardly on the net during a serve, re-serve. Each server gets one do-over per serve.']],
+      note:'The phrase “that was rim” will be used often and confidently.'},
+    {id:'bocce',name:'Bocce Ball',sub:'2-player teams',accent:'var(--blue)',f:[
+      ['Goal','Get your bocce balls closer to the pallino than the other team. The pallino is the little target ball.'],
+      ['How to play','One team tosses the pallino. Teams alternate rolling bocce balls toward it.'],
+      ['Scoring','At the end of each frame, the team with the closest ball scores — 1 point for each ball closer than the opponent’s closest ball.'],
+      ['How to win','<b>Game to 7.</b>'],
+      ['Time cap','<b>12 minutes.</b> If time runs out, the team in the lead wins. If tied, one sudden-death roll decides it.']],
+      note:'Knocking balls is legal. Knocking the pallino is legal. Acting like you meant to do either is also legal.'}
+  ]},
+  squad:{title:'Squad Events',sub:'Organized chaos with points. No sign-up required — hosts pick sides on the spot. This process will be described as fair, regardless of the evidence.',accent:'var(--teal)',events:[
+    {id:'dodgeball',name:'Sponge Dodgeball',sub:'Squad battle',accent:'var(--teal)',f:[
+      ['Goal','Get the other team out using soaked sponges.'],
+      ['How to play','Two teams. Soaked sponges. Clearly marked center line.'],
+      ['You are out if',['You get hit below the shoulders.','Someone catches your throw.']],
+      ['If your throw is caught','You are out, and one player from the other team gets to come back in.'],
+      ['Head shots','Head shots do not count. They also earn a stern committee glare.'],
+      ['How to win','<b>Best of 3 rounds.</b> Each round lasts 5 minutes or until one team is eliminated. If time runs out, the team with fewer players remaining loses.']],
+      note:'This is sponge dodgeball, not a water-based legal proceeding.'},
+    {id:'kickball',name:'Kickball',sub:'Squad battle',accent:'var(--green)',f:[
+      ['Goal','Score more runs than the other team using baseball rules and childhood confidence.'],
+      ['How to play',['Everyone in the lineup kicks.','Pitches should be rolled friendly.','No leadoffs. No stealing.','This is not the World Series.']],
+      ['How to win','Most runs after <b>3 innings or 40 minutes</b>.'],
+      ['Scoring limit','<b>5-run cap per half inning</b> to keep the game moving.'],
+      ['Getting runners out',['Catch the ball in the air.','Tag the runner.','Force out at the base.','Peg the runner below the shoulders.']],
+      ['Pegging rule','Below the shoulders = out. Above the shoulders = runner is safe and gets to act wounded.']],
+      note:'Several adults will take this too seriously. The Committee has already accepted this.'},
+    {id:'tugofwar',name:'Tug of War',sub:'2 teams vs 2 teams',accent:'var(--red)',f:[
+      ['Goal','Pull the center flag past your line.'],
+      ['How to win','<b>Best of 1 pull.</b>'],
+      ['Time cap','Each pull is capped at <b>90 seconds</b>. If time runs out, the side closest to pulling the flag across wins.'],
+      ['Safety rules',['No wrapping the rope around your body.','No sitting down on purpose.','No sudden “strategy” that looks like an insurance claim.','No gloves unless the hosts allow them.']]],
+      note:'Kids may be added to a side as strategic ballast.'},
+    {id:'dizzybat',name:'Dizzy Bat Race',sub:'Team vs. team',accent:'var(--violet)',f:[
+      ['Goal','Finish the relay before the other team and before your body files a formal complaint.'],
+      ['How to play',['Run to the bat.','Put your forehead on the bat.','Spin around the bat.','Drop the bat. Run back. Tag the next racer.']],
+      ['Spin count','Kids spin <b>3</b> times. Adults spin <b>6</b> times. Adults who have had a beverage also spin 6 times, but it will look like 12.'],
+      ['How to win','First team to get every racer through wins.']],
+      note:'Falling is legal, expected, and frankly the point.'}
+  ]},
+  skills:{title:'Skills Challenges',sub:'For people who claim they have touch. Sign up in the app for the events you want. Each person gets 2 official attempts — best counts. One warm-up if the line is short. Ties: one sudden-death attempt. Scoring: 1st = 10 · 2nd = 7 · 3rd = 5 · everyone who enters = 1.',accent:'var(--gold)',events:[
+    {id:'longcornhole',name:'Longest Cornhole Shot',sub:'Skills challenge',accent:'var(--red)',f:[
+      ['Goal','Sink a cornhole shot from the farthest distance.'],
+      ['How to play','Start at regulation distance. If you sink it, you stay alive and move back 5 feet. If you miss, you are out unless the hosts decide otherwise due to crowd pressure.'],
+      ['How to win','Last person to sink a shot from the longest distance wins.']],
+      note:'Every missed bag was apparently “right on line.”'},
+    {id:'fastwrap',name:'Fastest Tetherball Wrap',sub:'Skills challenge',accent:'var(--orange)',f:[
+      ['Goal','Wrap the tetherball around the pole as fast as possible.'],
+      ['How to play','One person goes at a time. Start on the signal. Hit the ball until the rope fully wraps around the pole.'],
+      ['How to win','Fastest full wrap wins.']],
+      note:'This event looks simple until your coordination leaves the premises.'},
+    {id:'frisbee',name:'Frisbee Accuracy Challenge',sub:'Skills challenge',accent:'var(--gold)',f:[
+      ['Goal','Hit the target as many times as possible.'],
+      ['How to play','Each player gets 5 throws from the set line.'],
+      ['Scoring','Most hits wins. Tie-breaker: one throw from 5 feet farther back.']],
+      note:'Blaming the wind is permitted but not respected.'},
+    {id:'crossbar',name:'Soccer Crossbar Challenge',sub:'Skills challenge',accent:'var(--teal)',f:[
+      ['Goal','Hit the crossbar.'],
+      ['How to play','Each player gets 3 kicks from the set line.'],
+      ['Scoring','Most crossbar hits wins. Tie-breaker: one sudden-death kick.']],
+      note:'A clean clang earns style points that count for absolutely nothing.'},
+    {id:'football',name:'Football Toss Target Challenge',sub:'Skills challenge',accent:'var(--blue)',f:[
+      ['Goal','Hit the target as many times as possible.'],
+      ['How to play','Each player gets 5 throws from the set line.'],
+      ['Scoring','Most hits wins. Tie-breaker: one throw from farther back.']],
+      note:'Quarterback confidence and quarterback accuracy are not the same thing.'},
+    {id:'tennisbocce',name:'Tennis Ball Bocce',sub:'Closest to the pin',accent:'var(--green)',f:[
+      ['Goal','Roll your tennis ball closest to the pin.'],
+      ['How to play','Each player gets one roll toward the target.'],
+      ['How to win','Closest ball wins. Tie-breaker: one sudden-death roll.']],
+      note:'Measurement disputes will be settled by tape measure and a heavy sigh from the host.'}
+  ]}
+};
+function ruleCard(ev){
+  const fields=ev.f.map(f=>{
+    const[label,...rest]=f;
+    const parts=rest.map(x=>Array.isArray(x)?`<ul>${x.map(li=>`<li>${li}</li>`).join('')}</ul>`:`<p>${x}</p>`).join('');
+    return `<div class="rlab">${esc(label)}</div>${parts}`;
+  }).join('');
+  return `<div class="rulecard" id="rule-${ev.id}" style="--accent:${ev.accent};border-left:5px solid ${ev.accent}">
+    <div class="rhead"><div class="rname">${esc(ev.name)}</div><div class="rsub">${esc(ev.sub)}</div></div>
+    ${fields}${ev.note?`<div class="cnote"><b>Committee note:</b> ${ev.note}</div>`:''}</div>`;
+}
+VIEWS.rules=function(){
+  const allEvents=[...RULES.tournaments.events,...RULES.squad.events,...RULES.skills.events];
+  return `${banner('Ratified after minutes of careful review','Official Rules')}
+  <div class="jumpbar">
+    <div class="eyebrow">Jump to an event</div>
+    <div class="jumprow">
+      ${RULES.tournaments.events.map(e=>`<button class="jump sun" data-jump="rule-${e.id}">${esc(e.name)}</button>`).join('')}
+      ${RULES.squad.events.map(e=>`<button class="jump tl" data-jump="rule-${e.id}">${esc(e.name)}</button>`).join('')}
+      ${RULES.skills.events.map(e=>`<button class="jump" data-jump="rule-${e.id}">${esc(e.name)}</button>`).join('')}
+      <button class="jump" data-jump="rule-voting">Awards Voting</button>
+      <button class="jump" data-jump="rule-bonus">Bonus Points</button>
+    </div>
+  </div>
+  <div class="goldcard"><div class="gt">★ The Golden Rule ★</div>
+    <p><b>Keep it moving.</b></p>
+    <p>Every event has a time cap. When the time cap hits, the leader wins. If the score is tied, we go to sudden death.</p>
+    <p>Sudden death sounds dramatic. In most cases, it just means one more point.</p>
+    <p>Arguing counts against you spiritually. Excessive rules-lawyering may also cost actual points.</p>
+  </div>
+  <div class="grid g2" style="margin-bottom:16px">
+    <div class="card"><div class="cardhdr" style="font-size:16px"><span class="medallion"></span>General Rules</div>
+      <ul style="margin:0;padding-left:20px;font-size:14px;line-height:1.55">
+      <li>Sign up in the app when an event requires signups.</li><li>Report to your event when called.</li>
+      <li>Listen for announcements.</li><li>Respect the time caps.</li>
+      <li>Report winners in the app or to the nearest responsible adult.</li><li>Hosts settle all disputes.</li>
+      <li>Bonus points may be awarded for great celebrations, elite trash talk, sportsmanship, and questionable athletic decisions.</li>
+      <li>Points may be deducted for ruining the vibe.</li></ul></div>
+    <div class="card"><div class="cardhdr" style="font-size:16px"><span class="medallion"></span>Basic Scoring</div>
+      <p style="margin:0 0 6px;font-size:14px">Unless the app or host says otherwise:</p>
+      <ul style="margin:0 0 8px;padding-left:20px;font-size:14px;line-height:1.55"><li><b>1st place = 10 points</b></li><li><b>2nd place = 7 points</b></li><li><b>3rd place = 5 points</b></li><li><b>Participation = 1 point</b></li></ul>
+      <p style="margin:0 0 4px;font-size:13.5px">For team events, points go to the team. For individual events, points go to the individual and may also help the family team.</p>
+      <p style="margin:0;font-size:13.5px">For squad events, hosts may assign points based on the format, the chaos level, and whether anyone made the mistake of asking for a full explanation.</p></div>
+  </div>
+  ${['tournaments','squad','skills'].map(k=>{const s=RULES[k];
+    return `<div class="rsec">${banner('',s.title,s.sub)}</div>${s.events.map(ruleCard).join('')}`;}).join('')}
+  <div class="rsec" id="rule-voting">${banner('','Awards Voting','Guests will be able to vote in the app for select awards.')}</div>
+  <div class="grid g2" style="margin-bottom:14px">
+    <div class="card"><div class="cardhdr" style="font-size:15px"><span class="medallion"></span>Guest voting awards</div>
+      <ul style="margin:0;padding-left:20px;font-size:14px;line-height:1.6"><li>Best Family Team Name</li><li>Best Family Flag</li><li>MVP Kid</li><li>Toughest Competitor</li><li>Biggest Upset</li><li>Best Celebration</li><li>Most Dramatic Athlete</li><li>Lifetime Achievement Award</li></ul></div>
+    <div class="card"><div class="cardhdr" style="font-size:15px"><span class="medallion"></span>Voting rules</div>
+      <ul style="margin:0;padding-left:20px;font-size:14px;line-height:1.6"><li>Each guest gets one vote per award.</li><li>Ballot stuffing is prohibited.</li><li>Lobbying is expected.</li><li>Campaign signs are not prohibited, which may have been an oversight.</li><li>The hosts may override results if democracy fails the event.</li></ul>
+      <div class="cnote" style="margin-top:8px"><b>Committee note:</b> All voting results are final unless they are funny enough to challenge.</div></div>
+  </div>
+  <div class="rsec" id="rule-bonus">${banner('','Bonus Points','Bonus points may be awarded at any time.')}</div>
+  <div class="grid g2" style="margin-bottom:14px">
+    <div class="card" style="border-color:var(--green)"><div class="cardhdr" style="font-size:15px;color:var(--green)"><span class="medallion"></span>Possible reasons include</div>
+      <ul style="margin:0;padding-left:20px;font-size:14px;line-height:1.6"><li>Great celebration</li><li>Elite trash talk</li><li>Outstanding sportsmanship</li><li>Questionable athletic decision</li><li>Impressive comeback</li><li>Refusing to quit despite clear physical decline</li><li>Making the event funnier</li><li>Helping a kid</li><li>Helping the hosts</li><li>Not making the hosts regret this idea</li></ul></div>
+    <div class="card" style="border-color:var(--red)"><div class="cardhdr" style="font-size:15px;color:var(--red)"><span class="medallion"></span>Points may be deducted for</div>
+      <ul style="margin:0;padding-left:20px;font-size:14px;line-height:1.6"><li>Rules-lawyering</li><li>Arguing too long</li><li>Taking a kid’s game too seriously</li><li>Delaying the schedule</li><li>Complaining about the app</li><li>Trying to turn sponge dodgeball into constitutional law</li></ul></div>
+  </div>
+  ${banner('','The Fine Print','')}
+  <div class="card center" style="margin-bottom:14px">
+    <p style="font-size:14px;margin:0 0 4px">Hosts settle all disputes. Bribes are noted but rarely effective.</p>
+    <p style="font-size:14px;margin:0 0 4px">The app is the official scoring system unless the app is wrong, frozen, ignored, or replaced by yelling.</p>
+    <p style="font-size:14px;margin:0 0 4px">All competitors participate at their own risk. Stretching is encouraged. Dignity is optional.</p>
+    <p style="font-size:14px;margin:0 0 10px">Medical professionals remain theoretical.</p>
+    <div class="disp" style="font-weight:900;font-size:18px">History will remember the champions.</div>
+    <div class="mut small" style="font-style:italic">The OFSC will remember everyone who needed ice afterward.</div>
   </div>`;
 };
 
@@ -635,7 +811,7 @@ document.addEventListener('change',async e=>{
 });
 
 document.addEventListener('click',async e=>{
-  const el=e.target.closest('[data-nav],[data-more],[data-close],[data-act],[data-lb],[data-suevent],[data-dosignup],[data-delsignup],[data-bkevent],[data-genbracket],[data-seedbracket],[data-clearevsignups],[data-matchresult],[data-shuffleseed],[data-seedmove],[data-dogenerate],[data-submitresult],[data-reppick],[data-repsubmit],[data-savetable],[data-savebest],[data-addbest],[data-savemanual],[data-savebonus],[data-sqpick],[data-sqwin],[data-savesquad],[data-tvwin],[data-saveteamvs],[data-saveskills],[data-completeevent],[data-delscore],[data-undoscore],[data-votemode],[data-voteall],[data-awardopen],[data-awardwinner],[data-awardreset],[data-awardlock],[data-castvote],[data-savewinner],[data-clearme],[data-tmsave],[data-tmcolor],[data-tmflag],[data-msave],[data-addguest],[data-saveguest],[data-login],[data-logout],[data-export],[data-fsexit],[data-fsbk],[data-awardprev],[data-awardnext],[data-awardreveal]');
+  const el=e.target.closest('[data-nav],[data-more],[data-close],[data-act],[data-lb],[data-suevent],[data-dosignup],[data-delsignup],[data-bkevent],[data-genbracket],[data-seedbracket],[data-clearevsignups],[data-matchresult],[data-shuffleseed],[data-seedmove],[data-dogenerate],[data-submitresult],[data-reppick],[data-repsubmit],[data-savetable],[data-savebest],[data-addbest],[data-savemanual],[data-savebonus],[data-sqpick],[data-sqwin],[data-savesquad],[data-tvwin],[data-saveteamvs],[data-saveskills],[data-completeevent],[data-delscore],[data-undoscore],[data-votemode],[data-voteall],[data-awardopen],[data-awardwinner],[data-awardreset],[data-awardlock],[data-castvote],[data-savewinner],[data-clearme],[data-jump],[data-tmsave],[data-tmcolor],[data-tmflag],[data-msave],[data-addguest],[data-saveguest],[data-login],[data-logout],[data-export],[data-fsexit],[data-fsbk],[data-awardprev],[data-awardnext],[data-awardreveal]');
   if(!el)return;const d=el.dataset;
 
   if('nav'in d){go(d.nav);return;}
@@ -646,6 +822,7 @@ document.addEventListener('click',async e=>{
   if('bkevent'in d){window.__bkEvent=d.bkevent;render();return;}
   if('votemode'in d){window.__voteAdmin=d.votemode==='admin';render();return;}
   if('clearme'in d){clearMe();return;}
+  if('jump'in d){const t=document.getElementById(d.jump);if(t)t.scrollIntoView({behavior:'smooth',block:'start'});return;}
   if('act'in d){await handleAct(d.act);return;}
 
   /* report winner (guest) */

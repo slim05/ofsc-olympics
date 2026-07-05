@@ -245,3 +245,30 @@ table.scoretbl{width:100%;border-collapse:separate;border-spacing:0}
 .fs-ctrl{position:sticky;bottom:0;display:flex;gap:10px;justify-content:center;padding:12px;background:linear-gradient(0deg,var(--cream),transparent)}
 .qrbox{background:#fff;border:3px solid var(--navy);padding:14px;border-radius:16px;display:inline-block;box-shadow:0 5px 0 var(--gold)}
 
+
+/* ---------- rules tab ---------- */
+.jumpbar{position:sticky;top:76px;z-index:5;background:var(--cream);padding:8px 0 10px;margin-bottom:6px;border-bottom:2px solid var(--line)}
+@media(max-width:899px){.jumpbar{top:70px}}
+.jumpbar .eyebrow{margin-bottom:5px}
+.jumprow{display:flex;gap:7px;flex-wrap:wrap}
+@media(max-width:640px){.jumprow{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch}}
+.jump{white-space:nowrap;font-family:var(--disp);font-weight:800;font-size:12.5px;letter-spacing:.04em;text-transform:uppercase;
+  background:#fff;border:2px solid var(--navy);border-radius:99px;padding:6px 12px;box-shadow:0 3px 0 var(--line);color:var(--ink)}
+.jump:active{transform:translateY(3px);box-shadow:none}
+.jump.sun{background:linear-gradient(180deg,var(--orange),var(--red));color:#fff;box-shadow:0 3px 0 var(--navy)}
+.jump.tl{background:linear-gradient(180deg,var(--teal),#0F7E8C);color:#fff;box-shadow:0 3px 0 var(--navy)}
+.rulecard{background:#fff;border:2.5px solid var(--navy);border-radius:14px;padding:14px 16px;margin-bottom:14px;scroll-margin-top:130px}
+.rulecard .rhead{display:flex;justify-content:space-between;align-items:baseline;gap:10px;border-bottom:2px solid var(--accent,var(--gold));padding-bottom:6px;margin-bottom:10px}
+.rulecard .rname{font-family:var(--disp);font-weight:900;font-size:20px;text-transform:uppercase}
+.rulecard .rsub{font-family:var(--disp);font-weight:800;font-size:11px;letter-spacing:.1em;color:var(--ink2);text-transform:uppercase;white-space:nowrap}
+.rlab{font-family:var(--disp);font-weight:800;font-size:11px;letter-spacing:.12em;color:var(--red);text-transform:uppercase;margin:9px 0 3px}
+.rulecard p{margin:0 0 4px;font-size:14px;line-height:1.45}
+.rulecard ul{margin:2px 0 6px;padding-left:20px}
+.rulecard li{font-size:14px;line-height:1.45;margin-bottom:2px}
+.cnote{background:#FFF6DA;border-left:4px solid var(--gold);border-radius:0 10px 10px 0;padding:8px 11px;margin-top:10px;
+  font-style:italic;font-size:13.5px;color:#6b5200;line-height:1.4}
+.cnote b{font-style:normal}
+.goldcard{background:#FFF9E8;border:2.5px solid var(--gold);border-radius:14px;padding:14px 18px;text-align:center;margin-bottom:16px}
+.goldcard .gt{font-family:var(--disp);font-weight:900;font-size:19px;color:var(--red);text-transform:uppercase;margin-bottom:6px}
+.goldcard p{margin:0 0 4px;font-size:14px;line-height:1.5}
+.rsec{scroll-margin-top:130px}
