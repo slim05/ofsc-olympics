@@ -10,7 +10,7 @@ const ordinal=n=>{const s=['th','st','nd','rd'],v=n%100;return n+(s[(v-20)%10]||
 const nowTime=()=>new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
 const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
 
-let state={settings:{},teams:[],guests:[],events:[],schedule:[],scores:[],awards:[],votes:[],signups:[],matches:[]};
+let state={settings:{},teams:[],guests:[],events:[],schedule:[],scores:[],awards:[],votes:[],signups:[],matches:[],bringItems:[],itemClaims:[]};
 let session=null;
 const isHost=()=>!!session;
 let route='home';
@@ -27,7 +27,7 @@ function closeModal(){$('#modalRoot').innerHTML='';}
 
 /* ---------------- data + realtime ---------------- */
 async function loadAll(){
-  const [se,tm,gu,ev,sc,scr,aw,vo,su,ma]=await Promise.all([
+  const [se,tm,gu,ev,sc,scr,aw,vo,su,ma,bi,ic]=await Promise.all([
     sb.from('settings').select('*').eq('id',1).single(),
     sb.from('teams').select('*').order('name'),
     sb.from('guests').select('*').order('display_name'),
@@ -37,12 +37,15 @@ async function loadAll(){
     sb.from('awards').select('*').order('sort'),
     sb.from('votes').select('*'),
     sb.from('bracket_signups').select('*').order('created_at'),
-    sb.from('matches').select('*')
+    sb.from('matches').select('*'),
+    sb.from('bring_items').select('*').order('sort'),
+    sb.from('item_claims').select('*').order('created_at')
   ]);
   if(se.data)state.settings=se.data;
   state.teams=tm.data||[];state.guests=gu.data||[];state.events=ev.data||[];
   state.schedule=sc.data||[];state.scores=scr.data||[];state.awards=aw.data||[];
   state.votes=vo.data||[];state.signups=su.data||[];state.matches=ma.data||[];
+  state.bringItems=bi.data||[];state.itemClaims=ic.data||[];
 }
 let reTimer=null;
 function scheduleReload(){clearTimeout(reTimer);reTimer=setTimeout(async()=>{await loadAll();softRender();},400);}
@@ -99,7 +102,7 @@ async function rpc(fn,args){const{error}=await sb.rpc(fn,args);if(error){toast(e
 /* ================= NAV ================= */
 function nav(){
   const votingLive=state.awards.some(a=>a.award_type==='vote'&&a.is_open);
-  const guestN=[['home','🏟️','Home'],['know','🧭','What to Know'],['report','🏆','My Events'],['signup','✍️','Sign Up'],['sched','📅','Schedule'],['rules','📜','Rules'],['standings','🏅','Standings'],['brackets','🎾','Brackets'],['teams','🚩','My Team']];
+  const guestN=[['home','🏟️','Home'],['know','🧭','What to Know'],['bring','🎒','Bring List'],['report','🏆','My Events'],['signup','✍️','Sign Up'],['sched','📅','Schedule'],['rules','📜','Rules'],['standings','🏅','Standings'],['brackets','🎾','Brackets'],['teams','🚩','My Team']];
   if(votingLive||isHost())guestN.push(['vote','🗳️','Vote']);
   const disp=[['dstand','📺','Standings'],['dbrack','📺','Brackets'],['dresults','📺','Recent Results']];
   const host=isHost()
@@ -349,7 +352,9 @@ VIEWS.know=function(){
 
   <div class="card">
     <div class="cardhdr"><span class="medallion"></span>🪑 What to bring</div>
-    <p style="margin:0;font-size:14.5px;line-height:1.5"><b>Please bring lawn chairs.</b> Also recommended: sunscreen, a water bottle, and whatever level of competitive spirit you can live with afterward.</p>
+    <p style="margin:0 0 8px;font-size:14.5px;line-height:1.5"><b>Please bring lawn chairs.</b> Also recommended: sunscreen, a water bottle, and whatever level of competitive spirit you can live with afterward.</p>
+    <p style="margin:0 0 10px;font-size:14px;line-height:1.5">We also need help with gear — canopies, cornhole boards, frisbees, and more. Claim what your family can bring on the Bring List:</p>
+    <button class="btn goldb sm" data-nav="bring">🎒 Open the Bring List</button>
   </div>
 
   <div class="card goldtrim">
@@ -364,6 +369,42 @@ VIEWS.know=function(){
   </div>
 
   <div class="cnote" style="margin-top:2px"><b>Committee note:</b> Arriving on time is appreciated. Arriving with dessert is remembered.</div>`;
+};
+
+/* ---------- BRING LIST ---------- */
+VIEWS.bring=function(){
+  const me=getMe();
+  const myTeamId=me?(guest(me)?.team_id||''):'';
+  if(!state.bringItems.length){
+    return `${banner('Many hands','Bring List')}<div class="empty"><div class="big">Nothing to claim yet</div>The hosts haven’t posted the bring list. Check back soon.</div>`;
+  }
+  const items=state.bringItems.slice().sort((a,b)=>(a.sort||0)-(b.sort||0));
+  const cards=items.map(it=>{
+    const claims=state.itemClaims.filter(c=>c.item_id===it.id);
+    const done=claims.length>=it.needed;
+    const pct=Math.min(100,Math.round(claims.length/Math.max(1,it.needed)*100));
+    const claimRows=claims.map(c=>{
+      const mineOrHost=isHost()||(myTeamId&&c.team_id===myTeamId);
+      return `<div class="row" style="padding:7px 10px">
+        <div class="swatch" style="background:${team(c.team_id)?.color||'#889'}"></div>
+        <div class="grow"><div class="name" style="font-size:13.5px">${esc(teamName(c.team_id))}</div></div>
+        ${mineOrHost?`<button class="btn xs danger" data-unclaim="${c.id}" title="Remove">✕</button>`:''}
+      </div>`;
+    }).join('');
+    return `<div class="card ${done?'':'goldtrim'}">
+      <div class="inline" style="justify-content:space-between;align-items:baseline">
+        <div class="cardhdr" style="font-size:18px;margin-bottom:2px"><span class="medallion"></span>${esc(it.name)}</div>
+        <span class="pill ${done?'ok':'warn'}">${claims.length} of ${it.needed}${done?' ✓':' needed'}</span>
+      </div>
+      <div class="bar" style="margin:6px 0 10px"><i style="width:${Math.max(4,pct)}%;background:${done?'var(--green)':'var(--orange)'}"></i></div>
+      ${claimRows||'<div class="mut small" style="margin-bottom:8px">No one signed up yet — be the hero.</div>'}
+      <button class="btn ${done?'ghost':'sunsetb'} sm block" data-claimitem="${it.id}" style="margin-top:8px">${done?'＋ Bring an extra anyway':'🎒 My team will bring one'}</button>
+    </div>`;
+  }).join('');
+  return `${banner('Many hands make light chaos','Bring List','Claim what your family can bring — the app keeps count so we don’t end up with nine soccer balls and zero canopies.')}
+  ${me?`<div class="inline" style="justify-content:space-between;margin-bottom:12px"><span class="sticker tealbg">Claiming as ${esc(teamName(myTeamId))}</span><button class="btn xs ghost" data-clearme>Not you?</button></div>`
+     :`<div class="card goldtrim" style="margin-bottom:14px"><label class="f" style="margin:0"><span>Who are you? (so we know which team is bringing it)</span><select class="i" data-voter><option value="">— select your name —</option>${state.guests.map(g=>`<option value="${g.id}">${esc(g.display_name)}</option>`).join('')}</select></label></div>`}
+  ${cards}`;
 };
 
 /* ---------- RULES ---------- */
@@ -859,7 +900,7 @@ document.addEventListener('change',async e=>{
 });
 
 document.addEventListener('click',async e=>{
-  const el=e.target.closest('[data-nav],[data-more],[data-close],[data-act],[data-lb],[data-suevent],[data-dosignup],[data-delsignup],[data-bkevent],[data-genbracket],[data-seedbracket],[data-clearevsignups],[data-matchresult],[data-shuffleseed],[data-seedmove],[data-dogenerate],[data-submitresult],[data-reppick],[data-repsubmit],[data-savetable],[data-savebest],[data-addbest],[data-savemanual],[data-savebonus],[data-sqpick],[data-sqwin],[data-savesquad],[data-tvwin],[data-saveteamvs],[data-saveskills],[data-completeevent],[data-delscore],[data-undoscore],[data-votemode],[data-voteall],[data-awardopen],[data-awardwinner],[data-awardreset],[data-awardlock],[data-castvote],[data-savewinner],[data-clearme],[data-jump],[data-tmsave],[data-tmcolor],[data-tmflag],[data-msave],[data-addguest],[data-saveguest],[data-login],[data-logout],[data-export],[data-fsexit],[data-fsbk],[data-awardprev],[data-awardnext],[data-awardreveal]');
+  const el=e.target.closest('[data-nav],[data-more],[data-close],[data-act],[data-lb],[data-suevent],[data-dosignup],[data-delsignup],[data-bkevent],[data-genbracket],[data-seedbracket],[data-clearevsignups],[data-matchresult],[data-shuffleseed],[data-seedmove],[data-dogenerate],[data-submitresult],[data-reppick],[data-repsubmit],[data-savetable],[data-savebest],[data-addbest],[data-savemanual],[data-savebonus],[data-sqpick],[data-sqwin],[data-savesquad],[data-tvwin],[data-saveteamvs],[data-saveskills],[data-completeevent],[data-delscore],[data-undoscore],[data-votemode],[data-voteall],[data-awardopen],[data-awardwinner],[data-awardreset],[data-awardlock],[data-castvote],[data-savewinner],[data-clearme],[data-jump],[data-claimitem],[data-unclaim],[data-tmsave],[data-tmcolor],[data-tmflag],[data-msave],[data-addguest],[data-saveguest],[data-login],[data-logout],[data-export],[data-fsexit],[data-fsbk],[data-awardprev],[data-awardnext],[data-awardreveal]');
   if(!el)return;const d=el.dataset;
 
   if('nav'in d){go(d.nav);return;}
@@ -871,6 +912,16 @@ document.addEventListener('click',async e=>{
   if('votemode'in d){window.__voteAdmin=d.votemode==='admin';render();return;}
   if('clearme'in d){clearMe();return;}
   if('jump'in d){const t=document.getElementById(d.jump);if(t)t.scrollIntoView({behavior:'smooth',block:'start'});return;}
+  if('claimitem'in d){
+    const me=getMe();
+    if(!me){toast('Select your name first so we know your team','err');return;}
+    const tid=guest(me)?.team_id;
+    if(!tid){toast('You are not on a team yet — see the hosts','err');return;}
+    if(await ins('item_claims',{item_id:d.claimitem,team_id:tid,guest_id:me})){
+      await loadAndRender();toast(teamName(tid)+' is on it! 🎒');
+    }
+    return;}
+  if('unclaim'in d){if(await del('item_claims',d.unclaim)){await loadAndRender();toast('Claim removed');}return;}
   if('act'in d){await handleAct(d.act);return;}
 
   /* report winner (guest) */
